@@ -1,0 +1,21 @@
+TaskID,TaskName,Category,Duration,RequiredSkills,PreferredPhases,MaxConcurrent
+T001,Frontend Development,Development,3,"JavaScript,React",[1,2,3],4
+T002,Backend API Design,Development,2,"Java,Spring",[2,3],3
+T003,Database Optimization,Infrastructure,1,"MySQL,PostgreSQL",[1,2,3,4],2
+T004,Mobile App Development,Mobile,4,"Java,Android",[2,3,4,5],3
+T005,Data Pipeline Setup,Data Science,2,"Python,Pandas",[1,3,5],2
+T006,UI/UX Design,Design,2,"Figma,Adobe XD",[1,2],3
+T007,Machine Learning Model,Data Science,3,"Python,Scikit-learn",[2,3,4],2
+T008,DevOps Setup,Infrastructure,2,"Docker,Kubernetes",[1,2,3],2
+T009,API Testing,Testing,1,"JavaScript,Postman",[3,4,5],4
+T010,Performance Optimization,Development,2,"JavaScript,React",[2,3,4],2
+T011,Security Audit,Security,2,"Security,Penetration Testing",[1,2],1
+T012,Content Management System,Development,3,"JavaScript,Node.js",[1,2,3],3
+T013,Cloud Migration,Infrastructure,4,"AWS,Azure",[2,3,4,5],2
+T014,Analytics Dashboard,Data Science,2,"Python,JavaScript",[1,3,5],3
+T015,Payment Integration,Development,2,"Java,JavaScript",[2,3,4],2
+T016,Email Marketing System,Marketing,1,"JavaScript,Node.js",[1,2],3
+T017,Real-time Chat Feature,Development,3,"JavaScript,WebSocket",[2,3,4],4
+T018,Inventory Management,Development,2,"Java,MySQL",[1,2,3],2
+T019,Reporting System,Data Science,2,"Python,SQL",[2,3,4],3
+T020,API Documentation,Documentation,1,"Markdown,Swagger",[1,2,3,4],5 
