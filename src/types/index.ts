@@ -11,8 +11,8 @@ interface Client{
 interface Worker{
     WorkerID:string;
     WorkerName:string;
-    Skills:string[];
-    AvailableSlots:number[];
+    Skills:string[]; //
+    AvailableSlots:number[]; //
     MaxLoadPerPhase:number;
     WorkerGroup:string;
     QualificationLevel:number;
@@ -24,8 +24,8 @@ interface Task {
     TaskName: string;
     Category: string;
     Duration: number;
-    RequiredSkills: string[]; 
-    PreferredPhases: number[]; 
+    RequiredSkills: string[]; //
+    PreferredPhases: number[];  //
     MaxConcurrent: number;
   }
 

@@ -6,12 +6,18 @@
 // Maintains data integrity during editing
 
 import React, { useState } from 'react';
+import QuickFix from './QuickFix';
 
 interface DataGridProps {
     data: any[];
     entityType: 'client' | 'worker' | 'task';
-    onDataChange: (updatedData: any[]) => void;
+    onDataChange: (updatedData: any[], immediate?: boolean) => void;
     validationErrors: any[];
+    allData?: {
+        clients: any[];
+        workers: any[];
+        tasks: any[];
+    };
 }
 
 interface ValidationError {
@@ -21,7 +27,7 @@ interface ValidationError {
     type: 'error' | 'warning';
 }
 
-export default function DataGrid({ data, entityType, onDataChange, validationErrors }: DataGridProps) {
+export default function DataGrid({ data, entityType, onDataChange, validationErrors = [], allData }: DataGridProps) {
     const [editingCell, setEditingCell] = useState<{ row: number; column: string } | null>(null);
     const [editValue, setEditValue] = useState<string>('');
 
@@ -63,7 +69,7 @@ export default function DataGrid({ data, entityType, onDataChange, validationErr
     };
 
     const getCellError = (rowIndex: number, column: string) => {
-        return validationErrors.find((error: ValidationError) => error.row === rowIndex && error.column === column);
+        return validationErrors?.find((error: ValidationError) => error.row === rowIndex && error.column === column);
     };
 
     const headers = getHeaders();
@@ -125,6 +131,16 @@ export default function DataGrid({ data, entityType, onDataChange, validationErr
                     ))}
                 </tbody>
             </table>
+
+            {/* QuickFix for missing task references (only for clients) */}
+            {entityType === 'client' && allData?.tasks && (
+                <QuickFix
+                    errors={validationErrors}
+                    data={data}
+                    availableTasks={allData.tasks}
+                    onDataChange={onDataChange}
+                />
+            )}
         </div>
     );
 }

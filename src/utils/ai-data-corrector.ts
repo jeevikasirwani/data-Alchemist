@@ -6,6 +6,12 @@ export interface CorrectionSuggestion {
     confidence: number;
     action: 'auto-fix' | 'manual-review' | 'data-enrichment';
     correctedValue?: any;
+    parameters?: {
+        field: string;
+        oldValue: string;
+        newValue: string;
+        operation: 'replace' | 'remove';
+    };
 }
 
 export interface DataPattern {
@@ -21,14 +27,43 @@ export class AIDataCorrector {
     async suggestCorrections(
         data: any[], 
         errors: ValidationError[], 
-        entityType: 'client' | 'worker' | 'task'
+        entityType: 'client' | 'worker' | 'task',
+        allData?: { clients: any[], workers: any[], tasks: any[] }
     ): Promise<CorrectionSuggestion[]> {
         // Analyze data patterns first
         this.analyzeDataPatterns(data, entityType);
         
         const suggestions: CorrectionSuggestion[] = [];
         
-        for (const error of errors) {
+        // Group errors by type for more efficient processing
+        const errorsByType = this.groupErrorsByType(errors);
+        
+        // Handle missing task reference errors
+        if (errorsByType.missingTaskRef && allData?.tasks) {
+            const taskRefSuggestions = await this.handleMissingTaskReferences(
+                errorsByType.missingTaskRef, 
+                data, 
+                allData.tasks
+            );
+            suggestions.push(...taskRefSuggestions);
+        }
+        
+        // Handle other error types
+        for (const error of errorsByType.duplicates) {
+            const suggestion = await this.generateCorrection(data, error, entityType);
+            if (suggestion) {
+                suggestions.push(suggestion);
+            }
+        }
+        
+        for (const error of errorsByType.required) {
+            const suggestion = await this.generateCorrection(data, error, entityType);
+            if (suggestion) {
+                suggestions.push(suggestion);
+            }
+        }
+        
+        for (const error of errorsByType.other) {
             const suggestion = await this.generateCorrection(data, error, entityType);
             if (suggestion) {
                 suggestions.push(suggestion);
@@ -281,19 +316,154 @@ export class AIDataCorrector {
         };
     }
 
-    async applyCorrection(
-        data: any[], 
-        suggestion: CorrectionSuggestion
-    ): Promise<any[]> {
-        if (suggestion.action === 'auto-fix' && suggestion.correctedValue !== undefined) {
-            const updatedData = [...data];
-            updatedData[suggestion.error.row] = {
-                ...updatedData[suggestion.error.row],
-                [suggestion.error.column]: suggestion.correctedValue
-            };
-            return updatedData;
+    private groupErrorsByType(errors: ValidationError[]) {
+        return {
+            missingTaskRef: errors.filter(e => e.message.includes('not found in tasks')),
+            duplicates: errors.filter(e => e.message.includes('Duplicate')),
+            required: errors.filter(e => e.message.includes('required')),
+            other: errors.filter(e => 
+                !e.message.includes('not found in tasks') && 
+                !e.message.includes('Duplicate') && 
+                !e.message.includes('required')
+            )
+        };
+    }
+
+    private async handleMissingTaskReferences(
+        errors: ValidationError[], 
+        clientData: any[], 
+        tasks: any[]
+    ): Promise<CorrectionSuggestion[]> {
+        const suggestions: CorrectionSuggestion[] = [];
+        const availableTaskIds = tasks.map(t => t.TaskID).filter(Boolean);
+        
+        for (const error of errors) {
+            const clientIndex = error.row;
+            const client = clientData[clientIndex];
+            if (!client) continue;
+            
+            // Extract the missing task ID from error message
+            const missingTaskMatch = error.message.match(/TaskID '(\w+)' not found/);
+            if (!missingTaskMatch) continue;
+            
+            const missingTaskId = missingTaskMatch[1];
+            
+            // Find similar task IDs using string similarity
+            const similarTasks = this.findSimilarTaskIds(missingTaskId, availableTaskIds);
+            
+            if (similarTasks.length > 0) {
+                // Suggest replacing with most similar task
+                const suggestedTaskId = similarTasks[0].taskId;
+                const confidence = similarTasks[0].similarity;
+                
+                suggestions.push({
+                    error: error,
+                    suggestion: `Replace missing TaskID '${missingTaskId}' with '${suggestedTaskId}'`,
+                    action: 'auto-fix',
+                    confidence: confidence,
+                    parameters: {
+                        field: 'RequestedTaskIDs',
+                        oldValue: missingTaskId,
+                        newValue: suggestedTaskId,
+                        operation: 'replace'
+                    }
+                });
+            } else {
+                // Suggest removing the invalid task ID
+                suggestions.push({
+                    error: error,
+                    suggestion: `Remove invalid TaskID '${missingTaskId}' from client's requested tasks`,
+                    action: 'manual-review',
+                    confidence: 0.7,
+                    parameters: {
+                        field: 'RequestedTaskIDs',
+                        oldValue: missingTaskId,
+                        newValue: '',
+                        operation: 'remove'
+                    }
+                });
+            }
         }
         
-        return data; // Return unchanged if not auto-fixable
+        return suggestions;
     }
-} 
+
+    private findSimilarTaskIds(targetTaskId: string, availableTaskIds: string[]): Array<{taskId: string, similarity: number}> {
+        const similarities = availableTaskIds.map(taskId => ({
+            taskId,
+            similarity: this.calculateStringSimilarity(targetTaskId, taskId)
+        }));
+        
+        return similarities
+            .filter(item => item.similarity > 0.6) // Only suggest if reasonably similar
+            .sort((a, b) => b.similarity - a.similarity)
+            .slice(0, 3); // Top 3 suggestions
+    }
+
+    private calculateStringSimilarity(str1: string, str2: string): number {
+        // Simple Levenshtein distance-based similarity
+        const matrix: number[][] = [];
+        const len1 = str1.length;
+        const len2 = str2.length;
+        
+        for (let i = 0; i <= len1; i++) {
+            matrix[i] = [i];
+        }
+        for (let j = 0; j <= len2; j++) {
+            matrix[0][j] = j;
+        }
+        
+        for (let i = 1; i <= len1; i++) {
+            for (let j = 1; j <= len2; j++) {
+                const cost = str1[i - 1] === str2[j - 1] ? 0 : 1;
+                matrix[i][j] = Math.min(
+                    matrix[i - 1][j] + 1,
+                    matrix[i][j - 1] + 1,
+                    matrix[i - 1][j - 1] + cost
+                );
+            }
+        }
+        
+        const maxLen = Math.max(len1, len2);
+        return (maxLen - matrix[len1][len2]) / maxLen;
+    }
+
+    async applyCorrection(data: any[], suggestion: CorrectionSuggestion): Promise<any[]> {
+        const correctedData = [...data];
+        const rowIndex = suggestion.error.row;
+        
+        console.log('Applying correction:', suggestion);
+        
+        if (rowIndex >= 0 && rowIndex < correctedData.length) {
+            const row = { ...correctedData[rowIndex] };
+            
+            // Handle different types of corrections
+            if (suggestion.parameters) {
+                const { field, oldValue, newValue, operation } = suggestion.parameters;
+                
+                if (operation === 'replace') {
+                    // Replace task ID in the RequestedTaskIDs array
+                    if (Array.isArray(row[field])) {
+                        row[field] = row[field].map((taskId: string) => 
+                            taskId === oldValue ? newValue : taskId
+                        );
+                    } else if (typeof row[field] === 'string') {
+                        row[field] = row[field].replace(oldValue, newValue);
+                    }
+                } else if (operation === 'remove') {
+                    // Remove task ID from the RequestedTaskIDs array
+                    if (Array.isArray(row[field])) {
+                        row[field] = row[field].filter((taskId: string) => taskId !== oldValue);
+                    }
+                }
+            } else if (suggestion.correctedValue !== undefined) {
+                // Handle legacy corrections
+                row[suggestion.error.column] = suggestion.correctedValue;
+            }
+            
+            correctedData[rowIndex] = row;
+        }
+        
+        return correctedData;
+    }
+}
