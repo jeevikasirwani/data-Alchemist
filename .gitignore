@@ -40,11 +40,5 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-
-# COMPREHENSIVE_DOCUMENTATION.md
-# AI_IMPLEMENTATION_GUIDE.md
-# COMPONENT_SPECIFICATIONS.md
-# DOCUMENTATION_INDEX.md
-# PROJECT_EXECUTION_GUIDE.md
-# QUICK_REFERENCE.md
-# HUGGING_FACE_SEMANTIC_MATCHER_GUIDE.md
+# ignore entire references folder
+references/
