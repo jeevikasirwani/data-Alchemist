@@ -7,34 +7,25 @@
 
 import React, { useState } from 'react';
 import QuickFix from './QuickFix';
+import { ValidationError } from '../utils/validation';
+import { Client, Worker, Task, EntityType, AppData } from '../types';
 
 interface DataGridProps {
-    data: any[];
-    entityType: 'client' | 'worker' | 'task';
-    onDataChange: (updatedData: any[], immediate?: boolean) => void;
-    validationErrors: any[];
-    allData?: {
-        clients: any[];
-        workers: any[];
-        tasks: any[];
-    };
-}
-
-interface ValidationError {
-    row: number;
-    column: string;
-    message: string;
-    type: 'error' | 'warning';
+    data: Client[] | Worker[] | Task[];
+    entityType: EntityType;
+    onDataChange: (updatedData: Client[] | Worker[] | Task[]) => void;
+    validationErrors: ValidationError[];
+    allData?: AppData;
 }
 
 export default function DataGrid({ data, entityType, onDataChange, validationErrors = [], allData }: DataGridProps) {
     const [editingCell, setEditingCell] = useState<{ row: number; column: string } | null>(null);
     const [editValue, setEditValue] = useState<string>('');
 
-    const getHeaders = () => {
+    const getHeaders = (): string[] => {
         switch (entityType) {
             case 'client':
-                return ['ClientID', 'ClientName', 'PriorityLevel', 'RequestedTaskIDs', 'GroupTag', 'AttributesJSON'];
+                return ['ClientId', 'ClientName', 'PriorityLevel', 'RequestedTaskIDs', 'GroupTag', 'AttributesJSON'];
             case 'worker':
                 return ['WorkerID', 'WorkerName', 'Skills', 'AvailableSlots', 'MaxLoadPerPhase', 'WorkerGroup', 'QualificationLevel'];
             case 'task':
@@ -44,13 +35,33 @@ export default function DataGrid({ data, entityType, onDataChange, validationErr
         }
     };
 
-    const handleCellEdit = (rowIndex: number, column: string, value: any) => {
+    const handleCellEdit = (rowIndex: number, column: string, value: string) => {
         const updatedData = [...data];
-        updatedData[rowIndex] = { ...updatedData[rowIndex], [column]: value };
-        onDataChange(updatedData);
+        
+        // Type-safe update based on entity type
+        switch (entityType) {
+            case 'client': {
+                const clientData = updatedData as Client[];
+                clientData[rowIndex] = { ...clientData[rowIndex], [column]: value };
+                onDataChange(clientData);
+                break;
+            }
+            case 'worker': {
+                const workerData = updatedData as Worker[];
+                workerData[rowIndex] = { ...workerData[rowIndex], [column]: value };
+                onDataChange(workerData);
+                break;
+            }
+            case 'task': {
+                const taskData = updatedData as Task[];
+                taskData[rowIndex] = { ...taskData[rowIndex], [column]: value };
+                onDataChange(taskData);
+                break;
+            }
+        }
     };
 
-    const startEditing = (rowIndex: number, column: string, value: any) => {
+    const startEditing = (rowIndex: number, column: string, value: unknown) => {
         setEditingCell({ row: rowIndex, column });
         setEditValue(String(value || ''));
     };
@@ -68,8 +79,12 @@ export default function DataGrid({ data, entityType, onDataChange, validationErr
         setEditValue('');
     };
 
-    const getCellError = (rowIndex: number, column: string) => {
+    const getCellError = (rowIndex: number, column: string): ValidationError | undefined => {
         return validationErrors?.find((error: ValidationError) => error.row === rowIndex && error.column === column);
+    };
+
+    const getCellValue = (row: Client | Worker | Task, header: string): unknown => {
+        return (row as unknown as Record<string, unknown>)[header];
     };
 
     const headers = getHeaders();
@@ -92,12 +107,13 @@ export default function DataGrid({ data, entityType, onDataChange, validationErr
                             {headers.map((header) => {
                                 const error = getCellError(rowIndex, header);
                                 const isEditing = editingCell?.row === rowIndex && editingCell?.column === header;
+                                const cellValue = getCellValue(row, header);
                                 
                                 return (
                                     <td 
                                         key={header} 
                                         className={`px-4 py-2 border-b ${error ? 'bg-red-50 border-red-300' : ''}`}
-                                        onClick={() => startEditing(rowIndex, header, row[header])}
+                                        onClick={() => startEditing(rowIndex, header, cellValue)}
                                     >
                                         {isEditing ? (
                                             <div className="flex gap-2">
@@ -116,7 +132,7 @@ export default function DataGrid({ data, entityType, onDataChange, validationErr
                                             </div>
                                         ) : (
                                             <div className="cursor-pointer">
-                                                {String(row[header] || '')}
+                                                {String(cellValue || '')}
                                                 {error && (
                                                     <div className="text-xs text-red-600 mt-1">
                                                         {error.message}
@@ -135,10 +151,18 @@ export default function DataGrid({ data, entityType, onDataChange, validationErr
             {/* QuickFix for missing task references (only for clients) */}
             {entityType === 'client' && allData?.tasks && (
                 <QuickFix
-                    errors={validationErrors}
-                    data={data}
+                    errors={validationErrors
+                        .filter(e => e.type !== 'critical' && e.entityType !== 'system')
+                        .map(e => ({
+                            row: e.row,
+                            column: e.column,
+                            message: e.message,
+                            type: e.type as 'error' | 'warning',
+                            entityType: e.entityType as 'client' | 'worker' | 'task'
+                        }))}
+                    data={data as Client[]}
                     availableTasks={allData.tasks}
-                    onDataChange={onDataChange}
+                    onDataChange={(updatedData) => onDataChange(updatedData as Client[])}
                 />
             )}
         </div>

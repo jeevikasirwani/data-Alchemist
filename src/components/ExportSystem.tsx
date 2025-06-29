@@ -2,19 +2,14 @@ import React, { useState } from 'react';
 import { FaDownload, FaFileExport, FaCog, FaCheck, FaSpinner } from 'react-icons/fa';
 import { BusinessRule } from './RuleBuilder';
 import { PriorityWeight } from './PriorityWeights';
+import { AppData } from '../types';
+import { ValidationSummary } from '../utils/validation';
 
 interface ExportSystemProps {
-    appData: {
-        clients: any[];
-        workers: any[];
-        tasks: any[];
-    };
+    appData: AppData;
     rules: BusinessRule[];
     priorities: PriorityWeight[];
-    validationSummary: {
-        totalErrors: number;
-        totalWarnings: number;
-    } | null;
+    validationSummary: ValidationSummary | null;
 }
 
 export default function ExportSystem({ appData, rules, priorities, validationSummary }: ExportSystemProps) {
@@ -24,7 +19,7 @@ export default function ExportSystem({ appData, rules, priorities, validationSum
     const [exportFormat, setExportFormat] = useState<'csv' | 'xlsx'>('csv');
 
     // Generate clean CSV content
-    const generateCSV = (data: any[], headers: string[]): string => {
+    const generateCSV = (data: Record<string, unknown>[], headers: string[]): string => {
         const csvHeaders = headers.join(',');
         const csvRows = data.map(row => 
             headers.map(header => {
@@ -68,14 +63,9 @@ export default function ExportSystem({ appData, rules, priorities, validationSum
                 description: rule.parameters?.description || ''
             })),
             priorityWeights: priorities.reduce((acc, weight) => {
-                acc[weight.id] = {
-                    weight: weight.weight,
-                    category: weight.category,
-                    rank: weight.rank,
-                    description: weight.description
-                };
+                acc[weight.id] = weight;
                 return acc;
-            }, {} as Record<string, any>),
+            }, {} as Record<string, typeof priorities[0]>),
             allocationSettings: {
                 optimizationObjective: getOptimizationObjective(),
                 constraints: extractConstraints(),
@@ -102,7 +92,7 @@ export default function ExportSystem({ appData, rules, priorities, validationSum
     };
 
     const extractConstraints = () => {
-        const constraints: any[] = [];
+        const constraints: Record<string, unknown>[] = [];
         
         rules.forEach(rule => {
             switch (rule.type) {
@@ -168,8 +158,8 @@ export default function ExportSystem({ appData, rules, priorities, validationSum
                 throw new Error(`No ${entityType} data to export`);
             }
 
-            const headers = Object.keys(data[0]);
-            const csvContent = generateCSV(data, headers);
+            const headers = Object.keys(data[0] as unknown as Record<string, unknown>);
+            const csvContent = generateCSV(data as unknown as Record<string, unknown>[], headers);
             
             const timestamp = new Date().toISOString().split('T')[0];
             const filename = `${entityType}_cleaned_${timestamp}.csv`;
@@ -198,10 +188,9 @@ export default function ExportSystem({ appData, rules, priorities, validationSum
             for (const entityType of ['clients', 'workers', 'tasks'] as const) {
                 const data = appData[entityType];
                 if (data.length > 0) {
-                    const headers = Object.keys(data[0]);
-                    const csvContent = generateCSV(data, headers);
-                    const filename = `${entityType}_cleaned_${timestamp}.csv`;
-                    downloadFile(csvContent, filename, 'text/csv');
+                    const headers = Object.keys(data[0] as unknown as Record<string, unknown>);
+                    const csvContent = generateCSV(data as unknown as Record<string, unknown>[], headers);
+                    downloadFile(csvContent, `${entityType}_cleaned_${timestamp}.csv`, 'text/csv');
                 }
             }
 
@@ -249,6 +238,9 @@ export default function ExportSystem({ appData, rules, priorities, validationSum
 
     const getDataSummary = () => {
         return {
+            clients: appData.clients.length,
+            workers: appData.workers.length,
+            tasks: appData.tasks.length,
             totalRecords: appData.clients.length + appData.workers.length + appData.tasks.length,
             entities: [
                 { name: 'Clients', count: appData.clients.length },
@@ -263,190 +255,170 @@ export default function ExportSystem({ appData, rules, priorities, validationSum
     const summary = getDataSummary();
 
     return (
-        <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold">📤 Export Clean Data & Configuration</h2>
-                <div className="flex items-center gap-2">
-                    {validationSummary && (
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                            validationSummary.totalErrors === 0 
-                                ? 'bg-green-100 text-green-800' 
-                                : 'bg-red-100 text-red-800'
-                        }`}>
-                            {validationSummary.totalErrors === 0 ? '✅ Ready' : `❌ ${validationSummary.totalErrors} Errors`}
-                        </span>
-                    )}
-                </div>
-            </div>
-
+        <div className="space-y-6">
             {/* Export Status */}
             {exportStatus && (
-                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <div className="flex items-center gap-2 text-blue-800">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="flex items-center gap-2">
                         {isExporting && <FaSpinner className="animate-spin" />}
-                        <span className="text-sm">{exportStatus}</span>
+                        <span className="text-blue-800">{exportStatus}</span>
                     </div>
                 </div>
             )}
 
             {/* Data Summary */}
-            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                <h3 className="font-medium mb-3">📊 Export Summary</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div className="text-center">
-                        <div className="text-lg font-bold text-blue-600">{summary.totalRecords}</div>
-                        <div className="text-gray-600">Total Records</div>
+            <div className="bg-white border border-gray-200 rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <FaCog className="text-blue-600" />
+                    Export Summary
+                </h3>
+                
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div className="text-center p-4 bg-gray-50 rounded">
+                        <div className="text-2xl font-bold text-blue-600">{summary.clients}</div>
+                        <div className="text-sm text-gray-600">Clients</div>
                     </div>
-                    <div className="text-center">
-                        <div className="text-lg font-bold text-green-600">{summary.entities.length}</div>
-                        <div className="text-gray-600">Entity Types</div>
+                    <div className="text-center p-4 bg-gray-50 rounded">
+                        <div className="text-2xl font-bold text-green-600">{summary.workers}</div>
+                        <div className="text-sm text-gray-600">Workers</div>
                     </div>
-                    <div className="text-center">
-                        <div className="text-lg font-bold text-purple-600">{summary.rules}</div>
-                        <div className="text-gray-600">Active Rules</div>
+                    <div className="text-center p-4 bg-gray-50 rounded">
+                        <div className="text-2xl font-bold text-purple-600">{summary.tasks}</div>
+                        <div className="text-sm text-gray-600">Tasks</div>
                     </div>
-                    <div className="text-center">
-                        <div className="text-lg font-bold text-orange-600">{summary.priorities}</div>
-                        <div className="text-gray-600">Priorities</div>
+                    <div className="text-center p-4 bg-gray-50 rounded">
+                        <div className="text-2xl font-bold text-orange-600">{summary.totalRecords}</div>
+                        <div className="text-sm text-gray-600">Total Records</div>
                     </div>
                 </div>
-                
-                <div className="mt-3 pt-3 border-t">
-                    <div className="flex flex-wrap gap-2">
-                        {summary.entities.map(entity => (
-                            <span key={entity.name} className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
-                                {entity.name}: {entity.count}
-                            </span>
-                        ))}
+
+                {/* Validation Status */}
+                {validationSummary && (
+                    <div className="mb-6 p-4 rounded-lg bg-gray-50">
+                        <h4 className="font-medium mb-2">Validation Status</h4>
+                        <div className="grid grid-cols-3 gap-4 text-sm">
+                            <div>
+                                <span className="text-red-600 font-semibold">{validationSummary.totalErrors}</span>
+                                <span className="text-gray-600 ml-1">Errors</span>
+                            </div>
+                            <div>
+                                <span className="text-yellow-600 font-semibold">{validationSummary.totalWarnings}</span>
+                                <span className="text-gray-600 ml-1">Warnings</span>
+                            </div>
+                            <div>
+                                <span className="text-blue-600 font-semibold">{validationSummary.validationScore}</span>
+                                <span className="text-gray-600 ml-1">Score</span>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Export Options */}
+            <div className="bg-white border border-gray-200 rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <FaDownload className="text-green-600" />
+                    Export Options
+                </h3>
+
+                <div className="space-y-4">
+                    {/* Individual Entity Exports */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <button
+                            onClick={() => exportEntity('clients')}
+                            disabled={isExporting || summary.clients === 0}
+                            className="flex items-center justify-center gap-2 p-3 border border-blue-300 text-blue-700 rounded hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <FaFileExport />
+                            Export Clients ({summary.clients})
+                        </button>
+                        
+                        <button
+                            onClick={() => exportEntity('workers')}
+                            disabled={isExporting || summary.workers === 0}
+                            className="flex items-center justify-center gap-2 p-3 border border-green-300 text-green-700 rounded hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <FaFileExport />
+                            Export Workers ({summary.workers})
+                        </button>
+                        
+                        <button
+                            onClick={() => exportEntity('tasks')}
+                            disabled={isExporting || summary.tasks === 0}
+                            className="flex items-center justify-center gap-2 p-3 border border-purple-300 text-purple-700 rounded hover:bg-purple-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <FaFileExport />
+                            Export Tasks ({summary.tasks})
+                        </button>
+                    </div>
+
+                    {/* Bulk Export */}
+                    <div className="border-t pt-4">
+                        <button
+                            onClick={exportAllData}
+                            disabled={isExporting || !isReadyForExport()}
+                            className="w-full flex items-center justify-center gap-2 p-4 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <FaDownload />
+                            Export All Data as CSV Package
+                        </button>
+                    </div>
+
+                    {/* Configuration Export */}
+                    <div className="border-t pt-4">
+                        <button
+                            onClick={exportRulesConfig}
+                            disabled={isExporting}
+                            className="w-full flex items-center justify-center gap-2 p-4 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <FaCog />
+                            Export Allocation Configuration
+                        </button>
                     </div>
                 </div>
             </div>
 
-            {/* Export Options */}
-            <div className="space-y-4">
-                {/* Individual Entity Exports */}
-                <div>
-                    <h3 className="font-medium mb-3">🗂️ Individual Entity Export</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        {(['clients', 'workers', 'tasks'] as const).map(entityType => (
-                            <button
-                                key={entityType}
-                                onClick={() => exportEntity(entityType)}
-                                disabled={isExporting || appData[entityType].length === 0}
-                                className={`p-3 border-2 rounded-lg text-left transition-colors ${
-                                    appData[entityType].length === 0
-                                        ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
-                                        : 'border-blue-200 hover:border-blue-400 hover:bg-blue-50'
-                                }`}
-                            >
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <h4 className="font-medium capitalize">{entityType}</h4>
-                                        <p className="text-sm text-gray-600">
-                                            {appData[entityType].length} records
-                                        </p>
-                                    </div>
-                                    <FaDownload className="text-blue-600" />
-                                </div>
-                            </button>
-                        ))}
+            {/* Export Settings */}
+            <div className="bg-white border border-gray-200 rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-4">Export Settings</h3>
+                
+                <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                        <input
+                            type="checkbox"
+                            id="includeMetadata"
+                            checked={includeMetadata}
+                            onChange={(e) => setIncludeMetadata(e.target.checked)}
+                            className="rounded border-gray-300"
+                        />
+                        <label htmlFor="includeMetadata" className="text-sm">
+                            Include metadata and validation summary
+                        </label>
                     </div>
-                </div>
-
-                {/* Rules Configuration Export */}
-                <div>
-                    <h3 className="font-medium mb-3">⚙️ Configuration Export</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <button
-                            onClick={exportRulesConfig}
-                            disabled={isExporting || rules.length === 0}
-                            className={`p-4 border-2 rounded-lg flex items-center justify-between transition-colors ${
-                                rules.length === 0
-                                    ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
-                                    : 'border-green-200 hover:border-green-400 hover:bg-green-50'
-                            }`}
-                        >
-                            <div className="text-left">
-                                <h4 className="font-medium">Rules Configuration</h4>
-                                <p className="text-sm text-gray-600">
-                                    Business rules + priorities (JSON)
-                                </p>
-                            </div>
-                            <FaCog className="text-green-600 text-xl" />
-                        </button>
-
-                        <div className="p-4 border-2 border-gray-200 rounded-lg bg-gray-50">
-                            <h4 className="font-medium text-gray-700">Export Options</h4>
-                            <div className="mt-2 space-y-2">
-                                <label className="flex items-center gap-2 text-sm">
-                                    <input
-                                        type="checkbox"
-                                        checked={includeMetadata}
-                                        onChange={(e) => setIncludeMetadata(e.target.checked)}
-                                    />
-                                    Include metadata & stats
-                                </label>
-                                <div className="flex gap-2">
-                                    <label className="flex items-center gap-1 text-sm">
-                                        <input
-                                            type="radio"
-                                            name="format"
-                                            value="csv"
-                                            checked={exportFormat === 'csv'}
-                                            onChange={() => setExportFormat('csv')}
-                                        />
-                                        CSV
-                                    </label>
-                                    <label className="flex items-center gap-1 text-sm">
-                                        <input
-                                            type="radio"
-                                            name="format"
-                                            value="xlsx"
-                                            checked={exportFormat === 'xlsx'}
-                                            onChange={() => setExportFormat('xlsx')}
-                                        />
-                                        Excel
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
+                    
+                    <div className="flex items-center gap-4">
+                        <span className="text-sm font-medium">Format:</span>
+                        <label className="flex items-center gap-2">
+                            <input
+                                type="radio"
+                                name="format"
+                                value="csv"
+                                checked={exportFormat === 'csv'}
+                                onChange={(e) => setExportFormat(e.target.value as 'csv')}
+                            />
+                            <span className="text-sm">CSV</span>
+                        </label>
+                        <label className="flex items-center gap-2">
+                            <input
+                                type="radio"
+                                name="format"
+                                value="xlsx"
+                                checked={exportFormat === 'xlsx'}
+                                onChange={(e) => setExportFormat(e.target.value as 'xlsx')}
+                            />
+                            <span className="text-sm">Excel (XLSX)</span>
+                        </label>
                     </div>
-                </div>
-
-                {/* Complete Export Package */}
-                <div className="pt-4 border-t">
-                    <button
-                        onClick={exportAllData}
-                        disabled={isExporting || !isReadyForExport()}
-                        className={`w-full p-4 rounded-lg font-medium transition-colors ${
-                            !isReadyForExport()
-                                ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                                : 'bg-blue-600 text-white hover:bg-blue-700'
-                        }`}
-                    >
-                        <div className="flex items-center justify-center gap-3">
-                            {isExporting ? (
-                                <FaSpinner className="animate-spin" />
-                            ) : (
-                                <FaFileExport />
-                            )}
-                            <span>
-                                {isExporting ? 'Exporting...' : 'Export Complete Package'}
-                            </span>
-                        </div>
-                        <p className="text-sm opacity-90 mt-1">
-                            Clean CSV files + rules.json configuration
-                        </p>
-                    </button>
-
-                    {!isReadyForExport() && (
-                        <div className="mt-2 text-sm text-red-600 text-center">
-                            {(validationSummary?.totalErrors || 0) > 0 
-                                ? '⚠️ Fix validation errors before exporting'
-                                : '⚠️ No data available for export'
-                            }
-                        </div>
-                    )}
                 </div>
             </div>
         </div>

@@ -551,9 +551,6 @@ export class ValidationEngine {
       const maxLoad = worker.MaxLoadPerPhase;
 
       // Check if any phase would be overloaded based on current task assignments
-      const phaseLoad: Map<number, number> = new Map();
-
-      // This would need actual task assignments, for now we simulate potential conflicts
       availableSlots.forEach((phase: number) => {
         if (typeof phase === "number") {
           const potentialLoad = this.tasks.filter((task) => {

@@ -95,8 +95,16 @@ export class SemanticMatcher {
    */
   private async loadHuggingFace(): Promise<void> {
     try {
-      // Dynamic import with error handling
-      const { pipeline } = await import('@xenova/transformers');
+      // Dynamic import with error handling and web-specific configuration
+      const { pipeline, env } = await import('@xenova/transformers');
+      
+      // Configure for web environment only
+      if (typeof window !== 'undefined') {
+        env.backends.onnx.wasm.simd = true;
+        env.backends.onnx.wasm.proxy = false;
+        // Disable Node.js backend explicitly
+        env.backends.onnx.node = false;
+      }
       
       this.pipeline = await pipeline('feature-extraction', this.config.modelName, {
         quantized: false,

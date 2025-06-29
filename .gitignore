@@ -42,3 +42,4 @@ next-env.d.ts
 
 # ignore entire references folder
 references/
+.vercel

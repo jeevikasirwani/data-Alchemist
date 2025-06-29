@@ -1,82 +1,122 @@
-import { useState } from 'react';
-import { BusinessRule } from '../components/RuleBuilder';
-import { PriorityWeight } from '../components/PriorityWeights';
+import { useState, useCallback, useRef } from 'react';
+import { ValidationEngine, ValidationError, ValidationSummary } from '../utils/validation';
+import { Client, Worker, Task, EntityType, AppData } from '../types';
 
-type EntityType = 'client' | 'worker' | 'task';
-
-interface AppData {
-    clients: any[];
-    workers: any[];
-    tasks: any[];
+interface DataManagementState {
+    clients: Client[];
+    workers: Worker[];
+    tasks: Task[];
+    validationErrors: ValidationError[];
+    validationSummary: ValidationSummary | null;
+    isValidating: boolean;
 }
 
 export const useDataManagement = () => {
-    const [appData, setAppData] = useState<AppData>({ clients: [], workers: [], tasks: [] });
-    const [activeTab, setActiveTab] = useState<EntityType | 'rules' | 'priorities' | 'export'>('client');
+    const [data, setData] = useState<DataManagementState>({
+        clients: [],
+        workers: [],
+        tasks: [],
+        validationErrors: [],
+        validationSummary: null,
+        isValidating: false
+    });
 
-    // Milestone 2 - Business Rules & Configuration
-    const [businessRules, setBusinessRules] = useState<BusinessRule[]>([]);
-    const [priorityWeights, setPriorityWeights] = useState<PriorityWeight[]>([]);
+    // Use useRef to prevent creating new validation engine on every render
+    const validationEngineRef = useRef(new ValidationEngine());
 
-    const updateData = (newData: AppData) => {
-        setAppData(newData);
+    const updateEntityData = (entityType: EntityType, newData: Client[] | Worker[] | Task[]) => {
+        console.log(`🔄 Updating ${entityType} data:`, newData);
+        
+        setData(prevData => {
+            const updatedData = { ...prevData };
+            
+            switch (entityType) {
+                case 'client':
+                    updatedData.clients = newData as Client[];
+                    break;
+                case 'worker':
+                    updatedData.workers = newData as Worker[];
+                    break;
+                case 'task':
+                    updatedData.tasks = newData as Task[];
+                    break;
+            }
+            
+            return updatedData;
+        });
     };
 
-    const handleDataChange = (entityType: EntityType, updatedData: any[], immediate: boolean = false) => {
-        const newData = {
-            ...appData,
-            [`${entityType}s`]: updatedData
-        };
-        setAppData(newData);
-        return newData;
-    };
+    const runValidation = useCallback((immediate = false) => {
+        // Use a single setTimeout to avoid multiple state updates
+        const delay = immediate ? 0 : 100;
+        
+        setTimeout(() => {
+            setData(currentData => {
+                // Set validating state and perform validation in one atomic operation
+                try {
+                    console.log('🔍 Running validation with current data:', {
+                        clients: currentData.clients.length,
+                        workers: currentData.workers.length,
+                        tasks: currentData.tasks.length
+                    });
+                    
+                    // First, set validating state
+                    const validatingData = { ...currentData, isValidating: true };
+                    
+                    // Defer the actual validation to next tick to avoid blocking
+                    setTimeout(() => {
+                        setData(dataToValidate => {
+                            try {
+                                validationEngineRef.current.setData(
+                                    dataToValidate.clients, 
+                                    dataToValidate.workers, 
+                                    dataToValidate.tasks
+                                );
+                                const { errors, summary } = validationEngineRef.current.validateAll();
+                                
+                                console.log(`✅ Validation complete: ${errors.length} errors found`);
+                                
+                                return {
+                                    ...dataToValidate,
+                                    validationErrors: errors,
+                                    validationSummary: summary,
+                                    isValidating: false
+                                };
+                            } catch (error) {
+                                console.error('Validation failed:', error);
+                                return {
+                                    ...dataToValidate,
+                                    validationErrors: [],
+                                    validationSummary: null,
+                                    isValidating: false
+                                };
+                            }
+                        });
+                    }, 10);
+                    
+                    return validatingData;
+                    
+                } catch (error) {
+                    console.error('Error starting validation:', error);
+                    return {
+                        ...currentData,
+                        isValidating: false
+                    };
+                }
+            });
+        }, delay);
+    }, []);
 
-    const getCurrentEntityData = (entityType: EntityType): any[] => {
-        switch (entityType) {
-            case 'client':
-                return appData.clients;
-            case 'worker':
-                return appData.workers;
-            case 'task':
-                return appData.tasks;
-            default:
-                return [];
-        }
-    };
-
-    const getTotalRecords = (): number => {
-        return appData.clients.length + appData.workers.length + appData.tasks.length;
-    };
-
-    const hasData = (): boolean => {
-        return getTotalRecords() > 0;
-    };
-
-    const getEntityCounts = () => {
-        return {
-            clients: appData.clients.length,
-            workers: appData.workers.length,
-            tasks: appData.tasks.length,
-            total: getTotalRecords()
-        };
-    };
+    const getAppData = (): AppData => ({
+        clients: data.clients,
+        workers: data.workers,
+        tasks: data.tasks
+    });
 
     return {
-        // Data state
-        appData,
-        activeTab,
-        setActiveTab,
-        businessRules,
-        setBusinessRules,
-        priorityWeights,
-        setPriorityWeights,
-        
-        // Data operations
-        updateData,
-        handleDataChange,
-        getCurrentEntityData,
-        getTotalRecords,
-        hasData,
-        getEntityCounts
+        data,
+        updateEntityData,
+        runValidation,
+        getAppData
     };
 }; 

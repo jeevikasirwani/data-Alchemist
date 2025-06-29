@@ -1,15 +1,12 @@
 import React, { useState } from 'react';
 import { FaMagic, FaLightbulb, FaCheck, FaSpinner } from 'react-icons/fa';
 import { BusinessRule } from './RuleBuilder';
+import { AppData } from '../types';
 
 interface NaturalLanguageRulesProps {
     onRuleGenerated: (rule: BusinessRule) => void;
     existingRules: BusinessRule[];
-    appData: {
-        clients: any[];
-        workers: any[];
-        tasks: any[];
-    };
+    appData: AppData;
 }
 
 export default function NaturalLanguageRules({ onRuleGenerated, existingRules, appData }: NaturalLanguageRulesProps) {
@@ -178,7 +175,7 @@ export default function NaturalLanguageRules({ onRuleGenerated, existingRules, a
         
         // Suggest based on actual data
         if (appData.tasks.length >= 2) {
-            const taskIds = appData.tasks.slice(0, 2).map(t => t.TaskID || t.taskId);
+            const taskIds = appData.tasks.slice(0, 2).map(t => t.TaskID);
             suggestions.push(`Tasks ${taskIds[0]} and ${taskIds[1]} must run together`);
         }
         
@@ -197,7 +194,7 @@ export default function NaturalLanguageRules({ onRuleGenerated, existingRules, a
         }
         
         if (appData.tasks.length > 0) {
-            const taskId = appData.tasks[0].TaskID || appData.tasks[0].taskId;
+            const taskId = appData.tasks[0].TaskID;
             suggestions.push(`Task ${taskId} should only run in phases 1 and 2`);
         }
         

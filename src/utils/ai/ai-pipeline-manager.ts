@@ -31,7 +31,16 @@ export async function initEmbeddingPipeline(): Promise<any> {
 
     try {
         console.log('🤖 Loading embedding model...');
-        const { pipeline } = await import('@xenova/transformers');
+        const { pipeline, env } = await import('@xenova/transformers');
+        
+        // Configure for web environment only
+        if (typeof window !== 'undefined') {
+            env.backends.onnx.wasm.simd = true;
+            env.backends.onnx.wasm.proxy = false;
+            // Disable Node.js backend explicitly
+            env.backends.onnx.node = false;
+        }
+        
         const config = getModelConfig();
         
         embeddingPipeline = await pipeline('feature-extraction', config.embeddingModel);
@@ -56,7 +65,16 @@ export async function initGenerativePipeline(): Promise<any> {
 
     try {
         console.log('🤖 Loading generative model...');
-        const { pipeline } = await import('@xenova/transformers');
+        const { pipeline, env } = await import('@xenova/transformers');
+        
+        // Configure for web environment only
+        if (typeof window !== 'undefined') {
+            env.backends.onnx.wasm.simd = true;
+            env.backends.onnx.wasm.proxy = false;
+            // Disable Node.js backend explicitly
+            env.backends.onnx.node = false;
+        }
+        
         const config = getModelConfig();
         
         // Add timeout protection
