@@ -584,76 +584,36 @@ export class ValidationEngine {
     return errors;
   }
 
-  // RULE 10: Phase-slot saturation: sum of task durations per Phase ≤ total worker slots
+  // RULE 10: Check if phases have enough worker capacity for task demand
   private validatePhaseSlotSaturation(): ValidationError[] {
     const errors: ValidationError[] = [];
 
-    // Calculate total available slots per phase
-    const phaseCapacity: Map<number, number> = new Map();
+    // Get all unique phases from workers and tasks
+    const allPhases = new Set<number>();
+    this.workers.forEach(w => (w.AvailableSlots || []).forEach(p => allPhases.add(p)));
+    this.tasks.forEach(t => (t.PreferredPhases || []).forEach(p => allPhases.add(p)));
 
-    this.workers.forEach((worker) => {
-      const availableSlots = Array.isArray(worker.AvailableSlots)
-        ? worker.AvailableSlots
-        : [];
-      availableSlots.forEach((phase: number) => {
-        if (typeof phase === "number" && phase > 0) {
-          phaseCapacity.set(
-            phase,
-            (phaseCapacity.get(phase) || 0) + worker.MaxLoadPerPhase
-          );
-        }
-      });
-    });
+    allPhases.forEach(phase => {
+      // Count worker capacity for this phase
+      const workerCapacity = this.workers
+        .filter(w => (w.AvailableSlots || []).includes(phase))
+        .reduce((sum, w) => sum + w.MaxLoadPerPhase, 0);
 
-    // Calculate required capacity per phase
-    const phaseRequirements: Map<
-      number,
-      { totalDuration: number; tasks: string[] }
-    > = new Map();
+      // Count tasks wanting this phase
+      const taskDemand = this.tasks
+        .filter(t => (t.PreferredPhases || []).includes(phase)).length;
 
-    this.tasks.forEach((task, index) => {
-      const preferredPhases = Array.isArray(task.PreferredPhases)
-        ? task.PreferredPhases
-        : [];
-      const duration = task.Duration || 0;
-
-      if (duration > 0 && preferredPhases.length > 0) {
-        // Distribute task duration across preferred phases
-        const durationPerPhase = duration / preferredPhases.length;
-
-        preferredPhases.forEach((phase: number) => {
-          if (typeof phase === "number" && phase > 0) {
-            const current = phaseRequirements.get(phase) || {
-              totalDuration: 0,
-              tasks: [],
-            };
-            current.totalDuration += durationPerPhase;
-            current.tasks.push(task.TaskID || `Task-${index}`);
-            phaseRequirements.set(phase, current);
-          }
-        });
-      }
-    });
-
-    // Check for oversaturation
-    for (const [phase, requirements] of phaseRequirements) {
-      const capacity = phaseCapacity.get(phase) || 0;
-
-      if (requirements.totalDuration > capacity) {
+      if (taskDemand > workerCapacity) {
         errors.push({
           row: -1,
           column: "Phase Planning",
-          message: `Phase ${phase} oversaturated: requires ${requirements.totalDuration.toFixed(
-            1
-          )} slots but only ${capacity} available. Tasks: ${requirements.tasks.join(
-            ", "
-          )}`,
+          message: `Phase ${phase}: ${taskDemand} tasks want it but only ${workerCapacity} worker slots available`,
           type: "critical",
           entityType: "system",
           severity: 5,
         });
       }
-    }
+    });
 
     return errors;
   }
