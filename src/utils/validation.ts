@@ -85,6 +85,7 @@ export class ValidationEngine {
     errors.push(...this.validateBusinessRuleConflicts());
     errors.push(...this.validateResourceAllocation());
 
+
     const summary = this.generateAdvancedSummary(errors);
 
     console.log(`✅ Validation complete: ${errors.length} issues found`);
@@ -543,21 +544,16 @@ export class ValidationEngine {
       }
     });
 
-    // Check for worker availability conflicts - OPTIMIZED VERSION
-    // PRE-PROCESS: Build phase -> tasks mapping once (O(tasks × phases_per_task))
-    const tasksByPhase = new Map<number, { taskIds: string[], count: number }>();
+    // Check for worker availability conflicts - SIMPLE OPTIMIZED VERSION
+    // PRE-PROCESS: Build phase -> task count mapping once (O(tasks × phases_per_task))
+    const tasksByPhase = new Map<number, number>();
     
-    this.tasks.forEach((task, taskIndex) => {
+    this.tasks.forEach((task) => {
       const preferredPhases = Array.isArray(task.PreferredPhases) ? task.PreferredPhases : [];
       
       preferredPhases.forEach((phase: number) => {
         if (typeof phase === "number" && phase > 0) {
-          if (!tasksByPhase.has(phase)) {
-            tasksByPhase.set(phase, { taskIds: [], count: 0 });
-          }
-          const phaseData = tasksByPhase.get(phase)!;
-          phaseData.taskIds.push(task.TaskID || `Task-${taskIndex}`);
-          phaseData.count++;
+          tasksByPhase.set(phase, (tasksByPhase.get(phase) || 0) + 1);
         }
       });
     });
@@ -569,15 +565,13 @@ export class ValidationEngine {
 
       availableSlots.forEach((phase: number) => {
         if (typeof phase === "number" && phase > 0) {
-          const phaseData = tasksByPhase.get(phase);
-          const potentialLoad = phaseData ? phaseData.count : 0;
+          const potentialLoad = tasksByPhase.get(phase) || 0;
 
           if (potentialLoad > maxLoad) {
-            const taskList = phaseData ? phaseData.taskIds.join(', ') : '';
             errors.push({
               row: index,
               column: "MaxLoadPerPhase", 
-              message: `Worker "${worker.WorkerID}" may be overloaded in phase ${phase}: ${potentialLoad} potential tasks vs ${maxLoad} max load. Tasks: ${taskList}`,
+              message: `Worker "${worker.WorkerID}" may be overloaded in phase ${phase}: ${potentialLoad} potential tasks vs ${maxLoad} max load`,
               type: "warning",
               entityType: "worker",
               severity: 2,
@@ -668,18 +662,17 @@ export class ValidationEngine {
   private validateSkillCoverageMatrix(): ValidationError[] {
     const errors: ValidationError[] = [];
 
-    // Build worker skills map
+    // Build worker skills map - Using Object for string keys (more readable)
     const availableSkills = new Set<string>();
-    const skillWorkerMap: Map<string, string[]> = new Map();
+    const skillWorkerMap: Record<string, string[]> = {};
 
     this.workers.forEach((worker) => {
       const skills = Array.isArray(worker.Skills) ? worker.Skills : [];
       skills.forEach((skill: string) => {
         if (skill) {
           availableSkills.add(skill);
-          const workers = skillWorkerMap.get(skill) || [];
-          workers.push(worker.WorkerID || "Unknown");
-          skillWorkerMap.set(skill, workers);
+          if (!skillWorkerMap[skill]) skillWorkerMap[skill] = [];
+          skillWorkerMap[skill].push(worker.WorkerID || "Unknown");
         }
       });
     });
@@ -703,7 +696,7 @@ export class ValidationEngine {
             severity: 5,
           });
         } else if (skill) {
-          const workers = skillWorkerMap.get(skill) || [];
+          const workers = skillWorkerMap[skill] || [];
           if (workers.length === 1) {
             errors.push({
               row: index,
@@ -721,57 +714,32 @@ export class ValidationEngine {
     return errors;
   }
 
-  // RULE 12: Max-concurrency feasibility: MaxConcurrent ≤ count of qualified, available workers
+  // RULE 12: Check if enough skilled workers exist for concurrent task execution
   private validateMaxConcurrencyFeasibility(): ValidationError[] {
     const errors: ValidationError[] = [];
 
-    // Build skill-to-workers mapping
-    const skillToWorkers: Map<string, WorkerData[]> = new Map();
+    this.tasks.forEach((task, taskIndex) => {
+      const neededSkills = task.RequiredSkills || [];
+      const wantedConcurrency = task.MaxConcurrent || 1;
 
-    this.workers.forEach((worker) => {
-      const skills = Array.isArray(worker.Skills) ? worker.Skills : [];
-      skills.forEach((skill: string) => {
-        if (skill) {
-          const workers = skillToWorkers.get(skill) || [];
-          workers.push(worker);
-          skillToWorkers.set(skill, workers);
-        }
-      });
-    });
+      if (neededSkills.length === 0) return; // Skip tasks with no skill requirements
 
-    this.tasks.forEach((task, index) => {
-      const requiredSkills = Array.isArray(task.RequiredSkills)
-        ? task.RequiredSkills
-        : [];
-      const maxConcurrent = task.MaxConcurrent || 1;
+      // Count workers who have ALL required skills
+      const qualifiedWorkerCount = this.workers.filter(worker => {
+        const workerSkills = worker.Skills || [];
+        return neededSkills.every(skill => workerSkills.includes(skill));
+      }).length;
 
-      if (requiredSkills.length > 0) {
-        // Find workers who have ALL required skills
-        let qualifiedWorkers = new Set(this.workers);
-
-        requiredSkills.forEach((skill: string) => {
-          if (skill) {
-            const workersWithSkill = new Set(skillToWorkers.get(skill) || []);
-            qualifiedWorkers = new Set(
-              [...qualifiedWorkers].filter((w) => workersWithSkill.has(w))
-            );
-          }
+      // Check: Can we run this many concurrent instances?
+      if (wantedConcurrency > qualifiedWorkerCount) {
+        errors.push({
+          row: taskIndex,
+          column: "MaxConcurrent",
+          message: `Want ${wantedConcurrency} concurrent but only ${qualifiedWorkerCount} workers have skills: ${neededSkills.join(", ")}`,
+          type: "error",
+          entityType: "task",
+          severity: 4,
         });
-
-        const qualifiedCount = qualifiedWorkers.size;
-
-        if (maxConcurrent > qualifiedCount) {
-          errors.push({
-            row: index,
-            column: "MaxConcurrent",
-            message: `MaxConcurrent (${maxConcurrent}) exceeds qualified workers (${qualifiedCount}) for task "${
-              task.TaskID
-            }". Required skills: ${requiredSkills.join(", ")}`,
-            type: "error",
-            entityType: "task",
-            severity: 4,
-          });
-        }
       }
     });
 
@@ -848,5 +816,7 @@ export class ValidationEngine {
 
     return summary;
   }
+
+
 
 }

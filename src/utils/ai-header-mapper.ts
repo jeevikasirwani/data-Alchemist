@@ -4,29 +4,29 @@ import { SemanticMatcher, createSemanticMatcher, getSchemaForEntityType, MatchRe
 function localStringSimilarity(str1: string, str2: string): number {
     const s1 = str1.toLowerCase().trim();
     const s2 = str2.toLowerCase().trim();
-    
+
     // Exact match
     if (s1 === s2) return 1.0;
-    
+
     // Contains match
     if (s1.includes(s2) || s2.includes(s1)) return 0.9;
-    
+
     // Levenshtein distance similarity
     const longer = s1.length > s2.length ? s1 : s2;
     const shorter = s1.length > s2.length ? s2 : s1;
-    
+
     if (longer.length === 0) return 1.0;
-    
+
     const distance = levenshteinDistance(longer, shorter);
     return (longer.length - distance) / longer.length;
 }
 
 function levenshteinDistance(str1: string, str2: string): number {
     const matrix = Array(str2.length + 1).fill(null).map(() => Array(str1.length + 1).fill(null));
-    
+
     for (let i = 0; i <= str1.length; i++) matrix[0][i] = i;
     for (let j = 0; j <= str2.length; j++) matrix[j][0] = j;
-    
+
     for (let j = 1; j <= str2.length; j++) {
         for (let i = 1; i <= str1.length; i++) {
             const cost = str1[i - 1] === str2[j - 1] ? 0 : 1;
@@ -37,7 +37,7 @@ function levenshteinDistance(str1: string, str2: string): number {
             );
         }
     }
-    
+
     return matrix[str2.length][str1.length];
 }
 
@@ -48,8 +48,8 @@ export interface EntityDetection {
 }
 
 export interface HeaderMapping {
-        expectedHeader: string;
-        confidence: number;
+    expectedHeader: string;
+    confidence: number;
     transformation: 'direct' | 'normalize' | 'split' | 'merge';
     method: 'exact' | 'fuzzy' | 'semantic' | 'alias' | 'semantic_simple';
 }
@@ -84,24 +84,24 @@ export class AIHeaderMapper {
 
         try {
             console.log('🤖 Starting AI Header Mapper initialization...');
-            
+
             // Set a very short timeout for initialization to prevent hanging
             const initPromise = this.attemptSemanticMatcherCreation();
-            
+
             // Wait for initialization with a timeout
             await Promise.race([
                 initPromise,
-                new Promise((_, reject) => 
+                new Promise((_, reject) =>
                     setTimeout(() => reject(new Error('Initialization timeout (10s)')), 10000)
                 )
             ]);
-            
+
             if (this.semanticMatcher) {
                 console.log('✅ AI Header Mapper initialized successfully with semantic matching');
             } else {
                 console.log('✅ AI Header Mapper initialized in fallback mode');
             }
-            
+
             this.isInitialized = true;
         } catch (error) {
             console.warn('⚠️ AI Header Mapper initialization failed, using safe fallback mode');
@@ -129,7 +129,7 @@ export class AIHeaderMapper {
                 threshold: 0.75,
                 cacheResults: true
             });
-            
+
         } catch (error) {
             console.warn('Failed to create semantic matcher:', error);
             this.semanticMatcher = null;
@@ -197,23 +197,23 @@ export class AIHeaderMapper {
         }
 
         const confidenceScores = { client: 0, worker: 0, task: 0 };
-        
+
         try {
             // Test headers against each entity type schema
             for (const entityType of ['client', 'worker', 'task'] as const) {
                 const schema = getSchemaForEntityType(entityType);
                 const matches = await this.semanticMatcher!.batchMatchHeaders(headers, schema);
-                
+
                 let totalConfidence = 0;
                 let matchCount = 0;
-                
+
                 for (const [header, match] of matches) {
                     if (match) {
                         totalConfidence += match.confidence;
                         matchCount++;
                     }
                 }
-                
+
                 // Calculate average confidence weighted by match percentage
                 const avgConfidence = matchCount > 0 ? totalConfidence / matchCount : 0;
                 const matchPercentage = matchCount / headers.length;
@@ -221,7 +221,7 @@ export class AIHeaderMapper {
             }
 
             // Find the best match
-            const bestType = Object.keys(confidenceScores).reduce((a, b) => 
+            const bestType = Object.keys(confidenceScores).reduce((a, b) =>
                 confidenceScores[a as keyof typeof confidenceScores] > confidenceScores[b as keyof typeof confidenceScores] ? a : b
             ) as 'client' | 'worker' | 'task';
 
@@ -261,7 +261,7 @@ export class AIHeaderMapper {
             if (headerStr.includes(keyword)) scores.task += 0.2;
         });
 
-        const bestType = Object.keys(scores).reduce((a, b) => 
+        const bestType = Object.keys(scores).reduce((a, b) =>
             scores[a as keyof typeof scores] > scores[b as keyof typeof scores] ? a : b
         ) as 'client' | 'worker' | 'task';
 
@@ -362,7 +362,7 @@ export class AIHeaderMapper {
      */
     private simpleFallbackMatch(header: string, schema: any): MatchResult | null {
         const normalizedHeader = header.toLowerCase().replace(/[^a-z0-9]/g, '');
-        
+
         for (const field of schema.fields) {
             // Exact match
             const normalizedField = field.fieldName.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -427,7 +427,7 @@ export class AIHeaderMapper {
         if (original.includes('_') || original.includes(' ')) return 'normalize';
         if (original.length > expected.length * 1.5) return 'split';
         if (original.length < expected.length * 0.5) return 'merge';
-        
+
         return 'normalize';
     }
 
@@ -436,14 +436,14 @@ export class AIHeaderMapper {
      */
     private createFallbackMapping(headers: string[], entityType: 'client' | 'worker' | 'task'): MappingResult {
         console.log('🔄 Creating fallback mapping for', headers.length, 'headers');
-        
+
         const mappings: Record<string, HeaderMapping> = {};
         const unmappedHeaders: string[] = [];
-        
+
         // Try simple matching for each header
         try {
             const schema = getSchemaForEntityType(entityType);
-            
+
             for (const header of headers) {
                 const match = this.simpleFallbackMatch(header, schema);
                 if (match) {
