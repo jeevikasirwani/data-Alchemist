@@ -79,10 +79,11 @@ export class ValidationEngine {
     // Advanced cross-entity validations (Rules 6-12)
     errors.push(...this.validateCrossEntityReferences());
     errors.push(...this.validateCircularDependencies());
+    errors.push(...this.validateTaskDurationVsPhases());
+    errors.push(...this.validateWorkerPhaseOverload());
     errors.push(...this.validatePhaseSlotSaturation());
     errors.push(...this.validateSkillCoverageMatrix());
     errors.push(...this.validateMaxConcurrencyFeasibility());
-    errors.push(...this.validateBusinessRuleConflicts());
     errors.push(...this.validateResourceAllocation());
 
 
@@ -447,40 +448,33 @@ export class ValidationEngine {
     return errors;
   }
 
-  // RULE 7: Circular co-run groups (A→B→C→A)
+  // RULE 7: Check for circular task dependencies (A→B→C→A) 
+  // Note: Cycle detection requires proper DFS algorithm - complexity is necessary
   private validateCircularDependencies(): ValidationError[] {
     const errors: ValidationError[] = [];
 
-    // Build dependency graph
-    const dependencyGraph: Map<string, string[]> = new Map();
-
-    this.tasks.forEach((task) => {
-      if (
-        task.TaskID &&
-        task.Dependencies &&
-        Array.isArray(task.Dependencies)
-      ) {
-        dependencyGraph.set(task.TaskID, task.Dependencies.filter(Boolean));
+    // Build dependency map
+    const deps: Record<string, string[]> = {};
+    this.tasks.forEach(task => {
+      if (task.TaskID && task.Dependencies?.length) {
+        deps[task.TaskID] = task.Dependencies.filter(Boolean);
       }
     });
 
-    // Detect circular dependencies using DFS
     const visiting = new Set<string>();
     const visited = new Set<string>();
 
-    const detectCycle = (taskId: string, path: string[]): boolean => {
+    const findCycle = (taskId: string, path: string[]): boolean => {
       if (visiting.has(taskId)) {
-        // Found a cycle
-        const cycleStart = path.indexOf(taskId);
-        const cycle = [...path.slice(cycleStart), taskId];
-
-        const taskIndex = this.tasks.findIndex((t) => t.TaskID === taskId);
+        const cycleIndex = path.indexOf(taskId);
+        const cycle = [...path.slice(cycleIndex), taskId];
+        const taskIndex = this.tasks.findIndex(t => t.TaskID === taskId);
         errors.push({
           row: taskIndex,
           column: "Dependencies",
-          message: `Circular dependency detected: ${cycle.join(" → ")}`,
+          message: `Circular dependency: ${cycle.join(" → ")}`,
           type: "critical",
-          entityType: "task",
+          entityType: "task", 
           severity: 5,
         });
         return true;
@@ -489,12 +483,10 @@ export class ValidationEngine {
       if (visited.has(taskId)) return false;
 
       visiting.add(taskId);
-      const dependencies = dependencyGraph.get(taskId) || [];
-
-      for (const depId of dependencies) {
-        if (detectCycle(depId, [...path, taskId])) {
-          return true;
-        }
+      const dependencies = deps[taskId] || [];
+      
+      for (const dep of dependencies) {
+        if (findCycle(dep, [...path, taskId])) return true;
       }
 
       visiting.delete(taskId);
@@ -502,41 +494,33 @@ export class ValidationEngine {
       return false;
     };
 
-    // Check each task for circular dependencies
-    for (const taskId of dependencyGraph.keys()) {
+    // Check all tasks
+    Object.keys(deps).forEach(taskId => {
       if (!visited.has(taskId)) {
-        detectCycle(taskId, []);
+        findCycle(taskId, []);
       }
-    }
+    });
 
     return errors;
   }
 
-  // RULE 8: Conflicting rules vs. phase-window constraints
-  private validateBusinessRuleConflicts(): ValidationError[] {
+  // RULE 8A: Check if task duration fits in preferred phase window
+  private validateTaskDurationVsPhases(): ValidationError[] {
     const errors: ValidationError[] = [];
 
-    // Check for phase conflicts
-    this.tasks.forEach((task, index) => {
-      const preferredPhases = Array.isArray(task.PreferredPhases)
-        ? task.PreferredPhases
-        : [];
+    this.tasks.forEach((task, taskIndex) => {
+      const phases = task.PreferredPhases || [];
       const duration = task.Duration || 0;
 
-      // Check if preferred phases can accommodate task duration
-      if (preferredPhases.length > 0 && duration > 0) {
-        const maxPhase = Math.max(...preferredPhases);
-        const minPhase = Math.min(...preferredPhases);
-        const phaseSpan = maxPhase - minPhase + 1;
-
+      if (phases.length > 0 && duration > 0) {
+        const phaseSpan = Math.max(...phases) - Math.min(...phases) + 1;
+        
         if (duration > phaseSpan) {
           errors.push({
-            row: index,
-            column: "PreferredPhases",
-            message: `Task duration (${duration}) exceeds preferred phase span (${phaseSpan}). Phases: ${preferredPhases.join(
-              ", "
-            )}`,
-            type: "warning",
+            row: taskIndex,
+            column: "Duration",
+            message: `Duration ${duration} > phase span ${phaseSpan} (phases: ${phases.join(", ")})`,
+            type: "warning", 
             entityType: "task",
             severity: 3,
           });
@@ -544,39 +528,34 @@ export class ValidationEngine {
       }
     });
 
-    // Check for worker availability conflicts - SIMPLE OPTIMIZED VERSION
-    // PRE-PROCESS: Build phase -> task count mapping once (O(tasks × phases_per_task))
-    const tasksByPhase = new Map<number, number>();
-    
-    this.tasks.forEach((task) => {
-      const preferredPhases = Array.isArray(task.PreferredPhases) ? task.PreferredPhases : [];
-      
-      preferredPhases.forEach((phase: number) => {
-        if (typeof phase === "number" && phase > 0) {
-          tasksByPhase.set(phase, (tasksByPhase.get(phase) || 0) + 1);
-        }
+    return errors;
+  }
+
+  // RULE 8B: Check if workers might be overloaded in specific phases
+  private validateWorkerPhaseOverload(): ValidationError[] {
+    const errors: ValidationError[] = [];
+
+    // Count tasks per phase
+    const tasksPerPhase: Record<number, number> = {};
+    this.tasks.forEach(task => {
+      (task.PreferredPhases || []).forEach(phase => {
+        tasksPerPhase[phase] = (tasksPerPhase[phase] || 0) + 1;
       });
     });
 
-    // VALIDATE: Now just O(workers × phases_per_worker) with O(1) lookups
-    this.workers.forEach((worker, index) => {
-      const availableSlots = Array.isArray(worker.AvailableSlots) ? worker.AvailableSlots : [];
-      const maxLoad = worker.MaxLoadPerPhase;
-
-      availableSlots.forEach((phase: number) => {
-        if (typeof phase === "number" && phase > 0) {
-          const potentialLoad = tasksByPhase.get(phase) || 0;
-
-          if (potentialLoad > maxLoad) {
-            errors.push({
-              row: index,
-              column: "MaxLoadPerPhase", 
-              message: `Worker "${worker.WorkerID}" may be overloaded in phase ${phase}: ${potentialLoad} potential tasks vs ${maxLoad} max load`,
-              type: "warning",
-              entityType: "worker",
-              severity: 2,
-            });
-          }
+    // Check each worker's capacity
+    this.workers.forEach((worker, workerIndex) => {
+      (worker.AvailableSlots || []).forEach(phase => {
+        const taskCount = tasksPerPhase[phase] || 0;
+        if (taskCount > worker.MaxLoadPerPhase) {
+          errors.push({
+            row: workerIndex,
+            column: "MaxLoadPerPhase",
+            message: `Worker "${worker.WorkerID}" phase ${phase}: ${taskCount} tasks > ${worker.MaxLoadPerPhase} max load`,
+            type: "warning",
+            entityType: "worker", 
+            severity: 2,
+          });
         }
       });
     });
@@ -760,7 +739,5 @@ export class ValidationEngine {
 
     return summary;
   }
-
-
 
 }
