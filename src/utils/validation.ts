@@ -658,55 +658,39 @@ export class ValidationEngine {
     return errors;
   }
 
-  // RULE 11: Skill-coverage matrix: every RequiredSkill maps to ≥1 worker
+  // RULE 11: Check if workers exist for each required skill
   private validateSkillCoverageMatrix(): ValidationError[] {
     const errors: ValidationError[] = [];
 
-    // Build worker skills map - Using Object for string keys (more readable)
-    const availableSkills = new Set<string>();
-    const skillWorkerMap: Record<string, string[]> = {};
+    this.tasks.forEach((task, taskIndex) => {
+      const neededSkills = task.RequiredSkills || [];
 
-    this.workers.forEach((worker) => {
-      const skills = Array.isArray(worker.Skills) ? worker.Skills : [];
-      skills.forEach((skill: string) => {
-        if (skill) {
-          availableSkills.add(skill);
-          if (!skillWorkerMap[skill]) skillWorkerMap[skill] = [];
-          skillWorkerMap[skill].push(worker.WorkerID || "Unknown");
-        }
-      });
-    });
+      neededSkills.forEach((skill: string) => {
+        if (!skill) return; // Skip empty skills
 
-    // Check task requirements
-    this.tasks.forEach((task, index) => {
-      const requiredSkills = Array.isArray(task.RequiredSkills)
-        ? task.RequiredSkills
-        : [];
+        // Count workers who have this skill
+        const workersWithSkill = this.workers.filter(worker => 
+          (worker.Skills || []).includes(skill)
+        ).length;
 
-      requiredSkills.forEach((skill: string) => {
-        if (skill && !availableSkills.has(skill)) {
+        if (workersWithSkill === 0) {
           errors.push({
-            row: index,
+            row: taskIndex,
             column: "RequiredSkills",
-            message: `No worker has required skill "${skill}" for task "${
-              task.TaskID || "Unknown"
-            }"`,
+            message: `No worker has skill "${skill}"`,
             type: "critical",
             entityType: "task",
             severity: 5,
           });
-        } else if (skill) {
-          const workers = skillWorkerMap[skill] || [];
-          if (workers.length === 1) {
-            errors.push({
-              row: index,
-              column: "RequiredSkills",
-              message: `Only one worker (${workers[0]}) has skill "${skill}" - potential bottleneck`,
-              type: "warning",
-              entityType: "task",
-              severity: 2,
-            });
-          }
+        } else if (workersWithSkill === 1) {
+          errors.push({
+            row: taskIndex,
+            column: "RequiredSkills", 
+            message: `Only 1 worker has skill "${skill}" - bottleneck risk`,
+            type: "warning",
+            entityType: "task",
+            severity: 2,
+          });
         }
       });
     });
