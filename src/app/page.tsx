@@ -11,7 +11,6 @@ import CorrectionSuggestions from '../components/CorrectionSuggestions';
 import QueryInterface from '../components/QueryInterface';
 
 // Custom hooks
-import { useFileUpload } from '../hooks/useFileUpload';
 import { useValidation } from '../hooks/useValidation';
 import { useCorrections } from '../hooks/useCorrections';
 import { useQueryProcessor } from '../hooks/useQueryProcessor';
@@ -24,34 +23,15 @@ import { EnhancedCorrectionSuggestion } from '../utils/ai';
 
 export default function Home() {
     // All hooks for modular functionality
-    const fileUpload = useFileUpload();
     const validation = useValidation();
     const corrections = useCorrections();
     const queryProcessor = useQueryProcessor();
     const dataManagement = useDataManagement();
 
-    // Handle file upload
-    const handleFileUpload = async (files: File[]) => {
-        // For now, assume all files are of the same type based on filename patterns
-        // In a real app, you might want a file selection UI for entity types
-        for (const file of files) {
-            const filename = file.name.toLowerCase();
-            let entityType: EntityType = 'client'; // default
-
-            if (filename.includes('client')) {
-                entityType = 'client';
-            } else if (filename.includes('worker')) {
-                entityType = 'worker';
-            } else if (filename.includes('task')) {
-                entityType = 'task';
-            }
-
-            await fileUpload.handleFileUpload(file, entityType, (entityType, data) => {
-                dataManagement.updateEntityData(entityType, data);
-                // Run validation after data update
-                setTimeout(() => dataManagement.runValidation(), 100);
-            });
-        }
+    // Simple callback to receive processed data from FileUpload
+    const handleDataProcessed = (entityType: EntityType, data: Client[] | Worker[] | Task[]) => {
+        dataManagement.updateEntityData(entityType, data);
+        setTimeout(() => dataManagement.runValidation(), 100);
     };
 
     // Handle data changes with validation
@@ -119,8 +99,7 @@ export default function Home() {
                 {/* File Upload Section */}
                 <div className="mb-6">
                     <FileUpload
-                        onFilesUploaded={handleFileUpload}
-                        isProcessing={fileUpload.uploadState.isProcessing}
+                        onDataProcessed={handleDataProcessed}
                     />
                 </div>
 
@@ -227,7 +206,7 @@ export default function Home() {
                 )}
 
                 {/* Empty State */}
-                {!hasData() && !fileUpload.uploadState.isProcessing && (
+                {!hasData() && (
                     <div className="text-center py-12">
                         <div className="text-6xl mb-4">📊</div>
                         <h2 className="text-2xl font-semibold text-gray-900 mb-2">Ready to Transform Your Data</h2>
