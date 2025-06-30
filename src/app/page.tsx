@@ -136,13 +136,16 @@ export default function Home() {
                     onClearQuery={queryProcessor.clearQuery}
                 />
 
-                {/* Validation Summary */}
-                <ValidationSummary
-                    validationSummary={dataManagement.data.validationSummary}
-                    validationErrors={dataManagement.data.validationErrors}
-                    isValidating={dataManagement.data.isValidating}
-                    aiValidationResults={[]}
-                />
+                {/* Validation Summary - Only show when there's data */}
+                {hasData() && (
+                    <ValidationSummary
+                        validationSummary={dataManagement.data.validationSummary}
+                        validationErrors={dataManagement.data.validationErrors}
+                        isValidating={dataManagement.data.isValidating}
+                        aiValidationResults={[]}
+                        hasData={hasData()}
+                    />
+                )}
 
                 {/* AI Correction Suggestions */}
                 <CorrectionSuggestions
