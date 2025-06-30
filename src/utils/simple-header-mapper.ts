@@ -1,5 +1,5 @@
 /**
- * AI-Powered Header Mapper - Let AI do ALL the thinking
+ * Minimal AI Header Mapper - Just what you need
  */
 
 import { generateChatCompletion } from './ai/ai-chat-completion';
@@ -18,7 +18,7 @@ const SCHEMAS = {
 };
 
 /**
- *  AI map headers automatically
+ * AI map headers automatically - ONE function that does everything
  */
 export async function mapHeaders(headers: string[]): Promise<MappingResult> {
     try {
@@ -57,31 +57,3 @@ Return ONLY JSON: {"Header": "ExpectedField"}
         return { mappings: {}, unmapped: headers, entityType: 'client' };
     }
 }
-
-// Legacy compatibility 
-export class SimpleHeaderMapper {
-    async mapHeaders(headers: string[]): Promise<MappingResult> {
-        return mapHeaders(headers);
-    }
-}
-
-/**
- * Simple factory function
- */
-export function createAIMapper(): SimpleHeaderMapper {
-    return new SimpleHeaderMapper();
-}
-
-/**
- * Ultra-simple function for quick mapping
- */
-export async function mapHeadersWithAI(headers: string[]): Promise<Record<string, string>> {
-    const mapper = new SimpleHeaderMapper();
-    const result = await mapper.mapHeaders(headers);
-    return result.mappings;
-}
-
-// Legacy compatibility functions
-export function quickMap(headers: string[]): Record<string, string> {
-    return {};
-} 
