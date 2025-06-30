@@ -366,49 +366,6 @@ export class ValidationEngine {
     return errors;
   }
 
-  // RULE 6: Unknown references (RequestedTaskIDs not in tasks; regex rules referencing missing TaskIDs)
-  // private validateCrossEntityReferences(): ValidationError[] {
-  //     const errors: ValidationError[] = [];
-  //     const taskIds = new Set(this.tasks.map(t => t.TaskID).filter(Boolean));
-
-  //     // Check client RequestedTaskIDs references
-  //     this.clients.forEach((client, index) => {
-  //         const requestedTaskIDs = Array.isArray(client.RequestedTaskIDs) ? client.RequestedTaskIDs : [];
-
-  //         requestedTaskIDs.forEach((taskId: string) => {
-  //             if (taskId && !taskIds.has(taskId)) {
-  //                 errors.push({
-  //                     row: index,
-  //                     column: 'RequestedTaskIDs',
-  //                     message: `Referenced TaskID "${taskId}" not found in tasks dataset`,
-  //                     type: 'error',
-  //                     entityType: 'client',
-  //                     severity: 4
-  //                 });
-  //             }
-  //         });
-  //     });
-
-  //     // Check task dependencies references
-  //     this.tasks.forEach((task, index) => {
-  //         if (task.Dependencies && Array.isArray(task.Dependencies)) {
-  //             task.Dependencies.forEach((depTaskId: string) => {
-  //                 if (depTaskId && !taskIds.has(depTaskId)) {
-  //                     errors.push({
-  //                         row: index,
-  //                         column: 'Dependencies',
-  //                         message: `Dependency TaskID "${depTaskId}" not found in tasks dataset`,
-  //                         type: 'error',
-  //                         entityType: 'task',
-  //                         severity: 4
-  //                     });
-  //                 }
-  //             });
-  //         }
-  //     });
-
-  //     return errors;
-  // }
   private validateCrossEntityReferences(): ValidationError[] {
     const errors: ValidationError[] = [];
     const taskIds = new Set(this.tasks.map((t) => t.TaskID));
