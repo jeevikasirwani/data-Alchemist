@@ -543,28 +543,41 @@ export class ValidationEngine {
       }
     });
 
-    // Check for worker availability conflicts
+    // Check for worker availability conflicts - OPTIMIZED VERSION
+    // PRE-PROCESS: Build phase -> tasks mapping once (O(tasks × phases_per_task))
+    const tasksByPhase = new Map<number, { taskIds: string[], count: number }>();
+    
+    this.tasks.forEach((task, taskIndex) => {
+      const preferredPhases = Array.isArray(task.PreferredPhases) ? task.PreferredPhases : [];
+      
+      preferredPhases.forEach((phase: number) => {
+        if (typeof phase === "number" && phase > 0) {
+          if (!tasksByPhase.has(phase)) {
+            tasksByPhase.set(phase, { taskIds: [], count: 0 });
+          }
+          const phaseData = tasksByPhase.get(phase)!;
+          phaseData.taskIds.push(task.TaskID || `Task-${taskIndex}`);
+          phaseData.count++;
+        }
+      });
+    });
+
+    // VALIDATE: Now just O(workers × phases_per_worker) with O(1) lookups
     this.workers.forEach((worker, index) => {
-      const availableSlots = Array.isArray(worker.AvailableSlots)
-        ? worker.AvailableSlots
-        : [];
+      const availableSlots = Array.isArray(worker.AvailableSlots) ? worker.AvailableSlots : [];
       const maxLoad = worker.MaxLoadPerPhase;
 
-      // Check if any phase would be overloaded based on current task assignments
       availableSlots.forEach((phase: number) => {
-        if (typeof phase === "number") {
-          const potentialLoad = this.tasks.filter((task) => {
-            const preferredPhases = Array.isArray(task.PreferredPhases)
-              ? task.PreferredPhases
-              : [];
-            return preferredPhases.includes(phase);
-          }).length;
+        if (typeof phase === "number" && phase > 0) {
+          const phaseData = tasksByPhase.get(phase);
+          const potentialLoad = phaseData ? phaseData.count : 0;
 
           if (potentialLoad > maxLoad) {
+            const taskList = phaseData ? phaseData.taskIds.join(', ') : '';
             errors.push({
               row: index,
-              column: "MaxLoadPerPhase",
-              message: `Worker "${worker.WorkerID}" may be overloaded in phase ${phase}: ${potentialLoad} potential tasks vs ${maxLoad} max load`,
+              column: "MaxLoadPerPhase", 
+              message: `Worker "${worker.WorkerID}" may be overloaded in phase ${phase}: ${potentialLoad} potential tasks vs ${maxLoad} max load. Tasks: ${taskList}`,
               type: "warning",
               entityType: "worker",
               severity: 2,
@@ -835,4 +848,5 @@ export class ValidationEngine {
 
     return summary;
   }
+
 }

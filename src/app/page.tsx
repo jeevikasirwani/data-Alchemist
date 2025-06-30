@@ -37,7 +37,7 @@ export default function Home() {
         for (const file of files) {
             const filename = file.name.toLowerCase();
             let entityType: EntityType = 'client'; // default
-            
+
             if (filename.includes('client')) {
                 entityType = 'client';
             } else if (filename.includes('worker')) {
@@ -45,7 +45,7 @@ export default function Home() {
             } else if (filename.includes('task')) {
                 entityType = 'task';
             }
-            
+
             await fileUpload.handleFileUpload(file, entityType, (entityType, data) => {
                 dataManagement.updateEntityData(entityType, data);
                 // Run validation after data update
@@ -62,10 +62,10 @@ export default function Home() {
 
     // Generate corrections after validation completes
     useEffect(() => {
-        if (dataManagement.data.validationErrors.length > 0 && 
-            (dataManagement.data.clients.length > 0 || 
-             dataManagement.data.workers.length > 0 || 
-             dataManagement.data.tasks.length > 0)) {
+        if (dataManagement.data.validationErrors.length > 0 &&
+            (dataManagement.data.clients.length > 0 ||
+                dataManagement.data.workers.length > 0 ||
+                dataManagement.data.tasks.length > 0)) {
             corrections.generateCorrections(dataManagement.getAppData(), dataManagement.data.validationErrors);
         }
     }, [dataManagement.data.validationErrors]);
@@ -85,9 +85,9 @@ export default function Home() {
     };
 
     const hasData = () => {
-        return dataManagement.data.clients.length > 0 || 
-               dataManagement.data.workers.length > 0 || 
-               dataManagement.data.tasks.length > 0;
+        return dataManagement.data.clients.length > 0 ||
+            dataManagement.data.workers.length > 0 ||
+            dataManagement.data.tasks.length > 0;
     };
 
     const getCurrentEntityData = (entityType: EntityType): Client[] | Worker[] | Task[] => {
@@ -162,11 +162,10 @@ export default function Home() {
                                     <button
                                         key={tab}
                                         onClick={() => setActiveTab(tab)}
-                                        className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                                            activeTab === tab
+                                        className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === tab
                                                 ? 'border-blue-500 text-blue-600'
                                                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                        }`}
+                                            }`}
                                     >
                                         {tab === 'client' && `Clients (${dataManagement.data.clients.length})`}
                                         {tab === 'worker' && `Workers (${dataManagement.data.workers.length})`}
@@ -196,9 +195,9 @@ export default function Home() {
                             {activeTab === 'rules' && (
                                 <RuleBuilder
                                     rules={[]}
-                                    onRulesChange={() => {}}
+                                    onRulesChange={() => { }}
                                     appData={dataManagement.getAppData()}
-                                    onGenerateConfig={() => {}}
+                                    onGenerateConfig={() => { }}
                                 />
                             )}
 
@@ -206,8 +205,8 @@ export default function Home() {
                             {activeTab === 'priorities' && (
                                 <PriorityWeights
                                     weights={[]}
-                                    onWeightsChange={() => {}}
-                                    onProfileSelect={() => {}}
+                                    onWeightsChange={() => { }}
+                                    onProfileSelect={() => { }}
                                 />
                             )}
 
