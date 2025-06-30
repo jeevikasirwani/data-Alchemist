@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { parseCSV, parseExcel, transformClientData, transformWorkerData, transformTaskData } from '../utils/parsers';
-import { AIHeaderMapper, MappingResult } from '../utils/ai-header-mapper';
+import { SimpleHeaderMapper, MappingResult } from '../utils/simple-header-mapper';
 import { Client, Worker, Task, EntityType, AppData } from '../types';
 
 interface FileUploadState {
@@ -20,7 +20,7 @@ export const useFileUpload = () => {
         uploadProgress: 0
     });
 
-    const mapper = new AIHeaderMapper();
+    const mapper = new SimpleHeaderMapper();
 
     const handleFileUpload = async (
         file: File, 
@@ -42,7 +42,7 @@ export const useFileUpload = () => {
             
             setUploadState(prev => ({ ...prev, uploadProgress: 30 }));
             
-            // Map headers using AI (for future enhancement - currently not used by transform functions)
+            // Map headers using smart pattern matching for better accuracy
             const headers = Object.keys(rawData[0] || {});
             const mappingResult: MappingResult = await mapper.mapHeaders(headers, entityType);
             
