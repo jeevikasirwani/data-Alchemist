@@ -9,9 +9,8 @@
 export { 
     initEmbeddingPipeline, 
     initGenerativePipeline, 
-    getModelConfig, 
-    isAIAvailable, 
-    getPipelineStatus 
+    getModelConfig ,
+    getPipelineStatus
 } from './ai-pipeline-manager';
 export { generateChatCompletion, generateTextCompletion } from './ai-chat-completion';
 export type { ChatMessage, ChatCompletionResponse } from './ai-chat-completion';
@@ -35,7 +34,7 @@ export { AIDataCorrectorEnhanced } from './ai-data-corrector-enhanced';
 import { AIBroadValidatorSimple } from './ai-broad-validator-simple';
 import { AIQueryProcessorSimple } from './ai-query-processor-simple';
 import { AIDataCorrectorEnhanced } from './ai-data-corrector-enhanced';
-import { getPipelineStatus, isAIAvailable } from './ai-pipeline-manager';
+import { getPipelineStatus } from './ai-pipeline-manager';
 
 // Enhanced Types
 export type { 
@@ -78,10 +77,10 @@ export async function checkAISystemStatus() {
     try {
         const status = getPipelineStatus();
         return {
-            available: isAIAvailable(),
+            // available: true,
             generative: status.generative,
             embedding: status.embedding,
-            message: 'AI system ready'
+            // message: 'AI system ready'
         };
     } catch (error) {
         return {

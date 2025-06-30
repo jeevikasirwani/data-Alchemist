@@ -141,56 +141,74 @@ export default function PriorityWeights({ weights, onWeightsChange, onProfileSel
 
     const getCategoryColor = (category: string) => {
         switch (category) {
-            case 'fulfillment': return 'bg-blue-100 text-blue-800';
-            case 'fairness': return 'bg-green-100 text-green-800';
-            case 'efficiency': return 'bg-yellow-100 text-yellow-800';
-            case 'quality': return 'bg-purple-100 text-purple-800';
-            default: return 'bg-gray-100 text-gray-800';
+            case 'fulfillment': return 'bg-blue-100 text-blue-800 border-blue-200';
+            case 'fairness': return 'bg-green-100 text-green-800 border-green-200';
+            case 'efficiency': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+            case 'quality': return 'bg-purple-100 text-purple-800 border-purple-200';
+            default: return 'bg-gray-100 text-gray-800 border-gray-200';
         }
     };
 
     const renderSlidersView = () => (
-        <div className="space-y-4">
+        <div className="space-y-6">
             {weights.map((weight) => (
-                <div key={weight.id} className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-2">
-                        <div>
-                            <h4 className="font-medium">{weight.name}</h4>
-                            <p className="text-sm text-gray-600">{weight.description}</p>
+                <div key={weight.id} className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow duration-200">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                                <h4 className="font-semibold text-gray-900 text-lg">{weight.name}</h4>
+                                <span className={`text-xs px-3 py-1 rounded-full font-medium border ${getCategoryColor(weight.category)}`}>
+                                    {weight.category}
+                                </span>
+                            </div>
+                            <p className="text-sm text-gray-600 leading-relaxed">{weight.description}</p>
                         </div>
-                        <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded">
-                            {(weight.weight * 100).toFixed(1)}%
-                        </span>
+                        <div className="ml-6 text-right">
+                            <span className="font-mono text-2xl font-bold bg-gradient-to-r from-gray-100 to-gray-200 text-gray-800 px-4 py-2 rounded-xl border border-gray-300">
+                                {(weight.weight * 100).toFixed(1)}%
+                            </span>
+                        </div>
                     </div>
-                    <input
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.01"
-                        value={weight.weight}
-                        onChange={(e) => updateWeight(weight.id, parseFloat(e.target.value))}
-                        className="w-full h-2 bg-gray-200 rounded-lg"
-                    />
+                    <div className="relative">
+                        <input
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.01"
+                            value={weight.weight}
+                            onChange={(e) => updateWeight(weight.id, parseFloat(e.target.value))}
+                            className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                            style={{
+                                background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${weight.weight * 100}%, #e5e7eb ${weight.weight * 100}%, #e5e7eb 100%)`
+                            }}
+                        />
+                    </div>
                 </div>
             ))}
         </div>
     );
 
     return (
-        <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-semibold mb-6">⚖️ Priority & Weight Configuration</h2>
+        <div className="bg-white rounded-xl shadow-lg p-8 border border-gray-200">
+            <div className="flex items-center gap-3 mb-8">
+                <FaBalanceScale className="text-2xl text-gray-600" />
+                <h2 className="text-2xl font-bold text-gray-900">Priority & Weight Configuration</h2>
+            </div>
             
-            <div className="mb-6">
-                <h3 className="font-medium mb-3">📋 Preset Profiles</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="mb-8">
+                <h3 className="font-semibold text-gray-800 mb-4 text-lg flex items-center gap-2">
+                    <span>📋</span>
+                    Preset Profiles
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {presetProfiles.map((profile) => (
                         <button
                             key={profile.id}
                             onClick={() => onProfileSelect(profile)}
-                            className="p-3 border-2 border-gray-200 rounded-lg text-left hover:border-blue-300"
+                            className="p-5 border-2 border-gray-200 rounded-xl text-left hover:border-blue-400 hover:bg-gradient-to-br hover:from-blue-50 hover:to-indigo-50 transition-all duration-300 shadow-sm hover:shadow-md"
                         >
-                            <h4 className="font-medium text-sm mb-1">{profile.name}</h4>
-                            <p className="text-xs text-gray-600">{profile.description}</p>
+                            <h4 className="font-semibold text-gray-900 mb-2">{profile.name}</h4>
+                            <p className="text-sm text-gray-600 leading-relaxed">{profile.description}</p>
                         </button>
                     ))}
                 </div>

@@ -113,16 +113,16 @@ export default function QuickFix({ errors, data, availableTasks, onDataChange }:
     };
 
     return (
-        <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <div className="flex items-center gap-2 mb-3">
-                <FaWrench className="text-yellow-600" />
-                <h4 className="font-medium text-yellow-900">Quick Fix: Missing Task References</h4>
-                <span className="bg-yellow-200 text-yellow-800 px-2 py-1 rounded-full text-xs">
+        <div className="mt-6 p-6 bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 rounded-xl shadow-lg">
+            <div className="flex items-center gap-3 mb-6">
+                <FaWrench className="text-yellow-600 text-xl" />
+                <h4 className="font-semibold text-yellow-900 text-lg">Quick Fix: Missing Task References</h4>
+                <span className="bg-gradient-to-r from-yellow-200 to-orange-200 text-yellow-800 px-3 py-1 rounded-full text-sm font-medium">
                     {missingTaskErrors.length} errors
                 </span>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-4">
                 {missingTaskErrors.map((error, index) => {
                     const missingTaskId = getMissingTaskId(error.message);
                     const clientName = data[error.row]?.ClientName || `Row ${error.row + 1}`;
@@ -130,30 +130,30 @@ export default function QuickFix({ errors, data, availableTasks, onDataChange }:
                     const isFixing = fixingRow === error.row;
 
                     return (
-                        <div key={index} className="bg-white p-3 rounded border">
-                            <div className="flex items-center justify-between mb-2">
-                                <div>
-                                    <span className="font-medium">{clientName}</span>
-                                    <span className="text-sm text-gray-600 ml-2">
-                                        Missing TaskID: <code className="bg-red-100 text-red-800 px-1 rounded">{missingTaskId}</code>
-                                    </span>
+                        <div key={index} className="bg-white p-5 rounded-xl border border-gray-200 shadow-md">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex-1">
+                                    <span className="font-semibold text-gray-800 text-lg">{clientName}</span>
+                                    <div className="text-sm text-gray-600 mt-1">
+                                        Missing TaskID: <code className="bg-red-100 text-red-800 px-2 py-1 rounded-md font-mono">{missingTaskId}</code>
+                                    </div>
                                 </div>
-                                <div className="flex gap-1">
+                                <div className="flex gap-2">
                                     {!isFixing && (
                                         <>
                                             <button
                                                 onClick={() => setFixingRow(error.row)}
-                                                className="p-1 text-blue-600 hover:bg-blue-100 rounded"
+                                                className="p-3 text-blue-600 hover:bg-blue-100 rounded-lg transition-all duration-200 hover:shadow-md"
                                                 title="Replace with another task"
                                             >
-                                                <FaEdit />
+                                                <FaEdit size={16} />
                                             </button>
                                             <button
                                                 onClick={() => fixByRemoving(error.row, missingTaskId)}
-                                                className="p-1 text-red-600 hover:bg-red-100 rounded"
+                                                className="p-3 text-red-600 hover:bg-red-100 rounded-lg transition-all duration-200 hover:shadow-md"
                                                 title="Remove this task ID"
                                             >
-                                                <FaTrash />
+                                                <FaTrash size={16} />
                                             </button>
                                         </>
                                     )}
@@ -161,22 +161,22 @@ export default function QuickFix({ errors, data, availableTasks, onDataChange }:
                             </div>
 
                             {isFixing && (
-                                <div className="mt-3 p-3 bg-gray-50 rounded">
-                                    <h5 className="text-sm font-medium mb-2">Replace with:</h5>
+                                <div className="mt-4 p-5 bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl border border-gray-200">
+                                    <h5 className="text-sm font-semibold mb-4 text-gray-800">Replace with:</h5>
                                     
                                     {/* Similar tasks suggestions */}
                                     {similarTasks.length > 0 && (
-                                        <div className="mb-3">
-                                            <p className="text-xs text-gray-600 mb-1">Suggested (similar tasks):</p>
-                                            <div className="flex flex-wrap gap-1">
+                                        <div className="mb-4">
+                                            <p className="text-xs text-gray-600 mb-3 font-medium">Suggested (similar tasks):</p>
+                                            <div className="flex flex-wrap gap-2">
                                                 {similarTasks.map((item, idx) => (
                                                     <button
                                                         key={idx}
                                                         onClick={() => setReplacementTaskId(item.taskId)}
-                                                        className={`px-2 py-1 text-xs rounded transition-colors ${
+                                                        className={`px-3 py-2 text-sm rounded-lg font-medium transition-all duration-200 ${
                                                             replacementTaskId === item.taskId
-                                                                ? 'bg-blue-500 text-white'
-                                                                : 'bg-blue-100 text-blue-800 hover:bg-blue-200'
+                                                                ? 'bg-blue-500 text-white shadow-md'
+                                                                : 'bg-blue-100 text-blue-800 hover:bg-blue-200 hover:shadow-sm'
                                                         }`}
                                                     >
                                                         {item.taskId} ({(item.similarity * 100).toFixed(0)}%)
@@ -187,11 +187,11 @@ export default function QuickFix({ errors, data, availableTasks, onDataChange }:
                                     )}
 
                                     {/* Manual input */}
-                                    <div className="flex gap-2">
+                                    <div className="flex gap-3">
                                         <select
                                             value={replacementTaskId}
                                             onChange={(e) => setReplacementTaskId(e.target.value)}
-                                            className="flex-1 px-2 py-1 text-sm border rounded"
+                                            className="flex-1 px-4 py-3 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all duration-200 shadow-sm"
                                         >
                                             <option value="">Select replacement task...</option>
                                             {getAvailableTaskIds().map(taskId => (
@@ -201,7 +201,7 @@ export default function QuickFix({ errors, data, availableTasks, onDataChange }:
                                         <button
                                             onClick={() => fixByReplacing(error.row, missingTaskId, replacementTaskId)}
                                             disabled={!replacementTaskId}
-                                            className="px-2 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 disabled:bg-gray-400"
+                                            className="px-4 py-3 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition-all duration-200 shadow-sm hover:shadow-md"
                                         >
                                             <FaCheck />
                                         </button>
@@ -210,7 +210,7 @@ export default function QuickFix({ errors, data, availableTasks, onDataChange }:
                                                 setFixingRow(null);
                                                 setReplacementTaskId('');
                                             }}
-                                            className="px-2 py-1 bg-gray-500 text-white text-sm rounded hover:bg-gray-600"
+                                            className="px-4 py-3 bg-gray-500 text-white text-sm rounded-lg hover:bg-gray-600 transition-all duration-200 shadow-sm hover:shadow-md"
                                         >
                                             <FaTimes />
                                         </button>
@@ -222,12 +222,18 @@ export default function QuickFix({ errors, data, availableTasks, onDataChange }:
                 })}
             </div>
 
-            <div className="mt-3 pt-3 border-t text-sm text-gray-600">
-                <p><strong>Quick Fix Options:</strong></p>
-                <ul className="text-xs list-disc list-inside mt-1 space-y-1">
-                    <li><FaEdit className="inline mr-1" /> Replace with valid TaskID</li>
-                    <li><FaTrash className="inline mr-1" /> Remove invalid TaskID from client's requests</li>
-                </ul>
+            <div className="mt-6 pt-6 border-t border-yellow-200 text-sm text-gray-700">
+                <p className="font-semibold mb-3">Quick Fix Options:</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="flex items-center gap-2 p-3 bg-white rounded-lg border border-gray-200">
+                        <FaEdit className="text-blue-500" />
+                        <span>Replace with valid TaskID</span>
+                    </div>
+                    <div className="flex items-center gap-2 p-3 bg-white rounded-lg border border-gray-200">
+                        <FaTrash className="text-red-500" />
+                        <span>Remove invalid TaskID from client's requests</span>
+                    </div>
+                </div>
             </div>
         </div>
     );

@@ -29,16 +29,16 @@ export class AIDataCorrectorEnhanced {
     }
 
     async suggestCorrections(
-        data: any[], 
-        errors: ValidationError[], 
+        data: any[],
+        errors: ValidationError[],
         entityType: 'client' | 'worker' | 'task',
         allData?: { clients: any[], workers: any[], tasks: any[] }
     ): Promise<EnhancedCorrectionSuggestion[]> {
         const suggestions: EnhancedCorrectionSuggestion[] = [];
-        
+
         // Group errors by type for efficient processing
         const errorGroups = this.groupErrorsByType(errors);
-        
+
         // Handle required field errors using specialized handler
         if (errorGroups.required.length > 0) {
             try {
@@ -78,14 +78,14 @@ export class AIDataCorrectorEnhanced {
         return {
             required: errors.filter(e => e.message.includes('required')),
             duplicates: errors.filter(e => e.message.includes('Duplicate')),
-            format: errors.filter(e => 
-                e.message.includes('Invalid') || 
+            format: errors.filter(e =>
+                e.message.includes('Invalid') ||
                 e.message.includes('must be') ||
                 e.message.includes('format')
             ),
             references: errors.filter(e => e.message.includes('not found')),
-            other: errors.filter(e => 
-                !e.message.includes('required') && 
+            other: errors.filter(e =>
+                !e.message.includes('required') &&
                 !e.message.includes('Duplicate') &&
                 !e.message.includes('Invalid') &&
                 !e.message.includes('not found')
@@ -120,12 +120,12 @@ Generate a unique ID that follows the pattern.`
         try {
             const response = await generateChatCompletion(messages);
             const content = response.choices[0].message.content;
-            
+
             const jsonMatch = content.match(/\{[\s\S]*\}/);
             if (!jsonMatch) return null;
 
             const result = JSON.parse(jsonMatch[0]);
-            
+
             return {
                 error,
                 suggestion: result.suggestion || `Generate unique ${entityType} ID`,
@@ -146,7 +146,7 @@ Generate a unique ID that follows the pattern.`
         entityType: 'client' | 'worker' | 'task'
     ): Promise<EnhancedCorrectionSuggestion | null> {
         const currentValue = data[error.row]?.[error.column];
-        
+
         const messages: ChatMessage[] = [
             {
                 role: 'system',
@@ -168,12 +168,12 @@ Provide a corrected value that fixes the format issue.`
         try {
             const response = await generateChatCompletion(messages);
             const content = response.choices[0].message.content;
-            
+
             const jsonMatch = content.match(/\{[\s\S]*\}/);
             if (!jsonMatch) return null;
 
             const result = JSON.parse(jsonMatch[0]);
-            
+
             return {
                 error,
                 suggestion: result.suggestion || `Fix ${error.column} format`,
@@ -202,17 +202,17 @@ Provide a corrected value that fixes the format issue.`
     async applyCorrection(data: any[], suggestion: EnhancedCorrectionSuggestion): Promise<any[]> {
         const correctedData = [...data];
         const rowIndex = suggestion.error.row;
-        
+
         if (rowIndex >= 0 && rowIndex < correctedData.length) {
             const row = { ...correctedData[rowIndex] };
-            
+
             if (suggestion.parameters) {
                 const { field, oldValue, newValue, operation } = suggestion.parameters;
-                
+
                 switch (operation) {
                     case 'replace':
                         if (Array.isArray(row[field])) {
-                            row[field] = row[field].map((item: any) => 
+                            row[field] = row[field].map((item: any) =>
                                 item === oldValue ? newValue : item
                             );
                         } else {
@@ -235,10 +235,10 @@ Provide a corrected value that fixes the format issue.`
             } else if (suggestion.correctedValue !== undefined) {
                 row[suggestion.error.column] = suggestion.correctedValue;
             }
-            
+
             correctedData[rowIndex] = row;
         }
-        
+
         return correctedData;
     }
 } 

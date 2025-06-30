@@ -29,7 +29,7 @@ export async function generateChatCompletion(messages: ChatMessage[]): Promise<C
     }
 
     try {
-        console.log('🤖 Initializing AI pipeline...');
+        console.log('Initializing AI pipeline...');
         const pipeline = await initGenerativePipeline();
         
         if (!pipeline) {
@@ -48,7 +48,7 @@ export async function generateChatCompletion(messages: ChatMessage[]): Promise<C
             }
         }).join('\n');
         
-        console.log('🤖 Generating response...');
+        console.log('Generating response...');
         
         // Generate response with timeout
         const result = await Promise.race([
@@ -144,3 +144,5 @@ export function parseAIJsonResponse<T>(content: string, fallback: T): T {
     }
     return fallback;
 } 
+
+
