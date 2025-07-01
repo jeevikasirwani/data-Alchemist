@@ -9,6 +9,7 @@ import React, { useState } from 'react';
 import QuickFix from './QuickFix';
 import { ValidationError } from '../utils/validation';
 import { Client, Worker, Task, EntityType, AppData } from '../types';
+import { SCHEMAS } from '../utils/simple-header-mapper';
 
 interface DataGridProps {
     data: Client[] | Worker[] | Task[];
@@ -23,6 +24,12 @@ export default function DataGrid({ data, entityType, onDataChange, validationErr
     const [editValue, setEditValue] = useState<string>('');
 
     const getHeaders = (): string[] => {
+        // Prefer shared schema if it exists for the entity
+        if (SCHEMAS[entityType as keyof typeof SCHEMAS]) {
+            return SCHEMAS[entityType as keyof typeof SCHEMAS];
+        }
+
+        // Fallback to previous hard-coded lists (should rarely happen)
         switch (entityType) {
             case 'client':
                 return ['ClientId', 'ClientName', 'PriorityLevel', 'RequestedTaskIDs', 'GroupTag', 'AttributesJSON'];

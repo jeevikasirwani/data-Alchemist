@@ -4,6 +4,7 @@
 
 import { generateChatCompletion } from './ai/ai-chat-completion';
 
+
 export interface MappingResult {
     mappings: Record<string, string>;
     unmapped: string[];
@@ -11,7 +12,7 @@ export interface MappingResult {
 }
 
 // What we want our data to look like
-const SCHEMAS = {
+export const SCHEMAS = {
     client: ['ClientID', 'ClientName', 'PriorityLevel', 'RequestedTaskIDs', 'GroupTag', 'AttributesJSON'],
     worker: ['WorkerID', 'WorkerName', 'Skills', 'AvailableSlots', 'MaxLoadPerPhase', 'WorkerGroup', 'QualificationLevel'],
     task: ['TaskID', 'TaskName', 'Category', 'Duration', 'RequiredSkills', 'PreferredPhases', 'MaxConcurrent']

@@ -81,13 +81,13 @@ export default function FileUpload({ onDataProcessed }: FileUploadProps) {
       }
 
       onDataProcessed(entityType, transformedData);
-      console.log(`✅ Successfully processed ${transformedData.length} ${entityType} records`);
+      console.log(` Successfully processed ${transformedData.length} ${entityType} records`);
 
       // Show success message with mapping info
       if (mappingResult.unmapped.length > 0) {
-        setMappingInfo(`✅ Processed successfully! Unmapped headers: ${mappingResult.unmapped.join(', ')}`);
+        setMappingInfo(` Processed successfully! Unmapped headers: ${mappingResult.unmapped.join(', ')}`);
       } else {
-        setMappingInfo('✅ All headers mapped successfully!');
+        setMappingInfo(' All headers mapped successfully!');
       }
 
       // Clear success message after 3 seconds
@@ -173,14 +173,14 @@ export default function FileUpload({ onDataProcessed }: FileUploadProps) {
       {/* AI Mapping Status */}
       {mappingInfo && (
         <div className="p-3 bg-blue-50 border border-blue-200 rounded text-blue-700 text-sm">
-          🤖 {mappingInfo}
+           {mappingInfo}
         </div>
       )}
 
       {/* Error Display */}
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 rounded text-red-700">
-          ❌ {error}
+          {error}
         </div>
       )}
 

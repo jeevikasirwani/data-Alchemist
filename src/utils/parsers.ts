@@ -396,26 +396,29 @@ const parsePreferredPhases = (input: unknown): number[] => {
 
 
 
-// helper 3 
+// helper 3 - Simple function to always return an array of strings
 const transformToStringArray = (input: unknown): string[] => {
-  if (input === null || input === undefined || input === "") return [];
+  // If it's null, undefined, or empty, return empty array
+  if (!input || input === "") return [];
 
-  // 1) Array
+  // If it's already an array, clean it up
   if (Array.isArray(input)) {
-    return input.map((item) => String(item).trim()).filter((s) => s !== "");
+    return input
+      .map(item => String(item).trim())  // Convert each item to string and trim
+      .filter(item => item !== "");      // Remove empty strings
   }
 
-  // 2) String
+  // If it's a string, split by commas
   if (typeof input === "string") {
     return input
-      .split(/[,;]+/)
-      .map((s) => s.trim())
-      .filter((s) => s !== "");
+      .split(",")                       // Split by commas
+      .map(item => item.trim())         // Trim each piece
+      .filter(item => item !== "");     // Remove empty pieces
   }
 
-  // 3) Other → single string
-  const str = String(input).trim();
-  return str === "" ? [] : [str];
+  // For anything else, convert to string and return as single-item array
+  const stringValue = String(input).trim();
+  return stringValue ? [stringValue] : [];
 };
 
 export { parseAvailableSlots, parsePreferredPhases, transformToStringArray };
