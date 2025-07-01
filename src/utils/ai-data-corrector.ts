@@ -147,6 +147,19 @@ export class AIDataCorrector {
     ): Promise<CorrectionSuggestion | null> {
         const pattern = this.dataPatterns.get(error.column);
         
+        // Handle generic required-column errors such as
+        // "Required column \"ClientId\" is missing or empty"
+        if (error.message.startsWith('Required column')) {
+            // If the column looks like an ID field, propose ID generation
+            const lowerCol = error.column.toLowerCase();
+            if (lowerCol.endsWith('id')) {
+                return this.suggestIDGeneration(error, data, entityType);
+            }
+
+            // Otherwise fall back to generic suggestion, possibly using common value
+            return this.suggestGenericCorrection(error, pattern);
+        }
+        
         switch (error.message) {
             case 'ClientID is required':
             case 'WorkerID is required':

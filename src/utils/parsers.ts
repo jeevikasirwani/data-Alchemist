@@ -207,110 +207,6 @@ export const transformTaskData = (rawData: UnknownRecord[]): Task[] => {
   });
 };
 
-// // Helper function to parse AvailableSlots
-// const parseAvailableSlots = (slots: unknown): number[] => {
-//     if (!slots) return [];
-
-//     try {
-//         // If it's already an array, convert to numbers
-//         if (Array.isArray(slots)) {
-//             return slots.map((slot: unknown) => {
-//                 const num = typeof slot === 'number' ? slot : parseInt(String(slot));
-//                 return isNaN(num) ? 0 : num;
-//             }).filter(slot => !isNaN(slot));
-//         }
-
-//         // If it's a string
-//         if (typeof slots === 'string') {
-//             // Handle array format like "[1,2,3,4,5]"
-//             if (slots.startsWith('[') && slots.endsWith(']')) {
-//                 const parsed = JSON.parse(slots);
-//                 if (Array.isArray(parsed)) {
-//                     return parsed.map((item: unknown) => {
-//                         const num = typeof item === 'number' ? item : parseInt(String(item));
-//                         return isNaN(num) ? 0 : num;
-//                     });
-//                 }
-//             }
-//             // Handle comma-separated format
-//             return slots.split(',').map(s => parseInt(s.trim())).filter(slot => !isNaN(slot));
-//         }
-
-//         // For any other type, try to convert to number
-//         const num = typeof slots === 'number' ? slots : parseInt(String(slots));
-//         return isNaN(num) ? [] : [num];
-//     } catch {
-//         return [];
-//     }
-// };
-
-// // Helper function to parse PreferredPhases
-// const parsePreferredPhases = (phases: unknown): number[] => {
-//     if (!phases) return [];
-
-//     try {
-//         // If it's already an array, convert to numbers
-//         if (Array.isArray(phases)) {
-//             return phases.map((phase: unknown) => {
-//                 const num = typeof phase === 'number' ? phase : parseInt(String(phase));
-//                 return isNaN(num) ? 0 : num;
-//             }).filter(phase => !isNaN(phase));
-//         }
-
-//         // If it's a string
-//         if (typeof phases === 'string') {
-//             // Handle array format like "[1,2,3]"
-//             if (phases.startsWith('[') && phases.endsWith(']')) {
-//                 const parsed = JSON.parse(phases);
-//                 if (Array.isArray(parsed)) {
-//                     return parsed.map((item: unknown) => {
-//                         const num = typeof item === 'number' ? item : parseInt(String(item));
-//                         return isNaN(num) ? 0 : num;
-//                     });
-//                 }
-//             }
-//             // Handle range format like "1-3"
-//             if (phases.includes('-')) {
-//                 const parts = phases.split('-');
-//                 if (parts.length === 2) {
-//                     const start = parseInt(parts[0].trim());
-//                     const end = parseInt(parts[1].trim());
-//                     if (!isNaN(start) && !isNaN(end) && start <= end) {
-//                         return Array.from({ length: end - start + 1 }, (_, i) => start + i);
-//                     }
-//                 }
-//             }
-//             // Handle comma-separated format
-//             return phases.split(',').map(s => parseInt(s.trim())).filter(phase => !isNaN(phase));
-//         }
-
-//         // For any other type, try to convert to number
-//         const num = typeof phases === 'number' ? phases : parseInt(String(phases));
-//         return isNaN(num) ? [] : [num];
-//     } catch {
-//         return [];
-//     }
-// };
-
-// // Helper function to transform various input types to string array
-// const transformToStringArray = (input: unknown): string[] => {
-//     if (!input) return [];
-
-//     // If it's already an array, convert all elements to strings
-//     if (Array.isArray(input)) {
-//         return input.map((item: unknown) => String(item).trim()).filter(item => item);
-//     }
-
-//     // If it's a string, split by comma and trim
-//     if (typeof input === 'string') {
-//         return input.split(',').map((item: string) => item.trim()).filter(item => item);
-//     }
-
-//     // For any other type, convert to string and return as single-item array
-//     const stringValue = String(input).trim();
-//     return stringValue ? [stringValue] : [];
-// };
-
 const parseAvailableSlots = (input: unknown): number[] => {
   if (input === null || input === undefined || input === "") return [];
 
@@ -393,13 +289,10 @@ const parsePreferredPhases = (input: unknown): number[] => {
   return isNaN(single) ? [] : [single];
 };
 
-
-
-
 // helper 3 - Simple function to always return an array of strings
 const transformToStringArray = (input: unknown): string[] => {
   // If it's null, undefined, or empty, return empty array
-  if (!input || input === "") return [];
+  if (input === null || input === undefined || input === "") return [];
 
   // If it's already an array, clean it up
   if (Array.isArray(input)) {
@@ -408,8 +301,21 @@ const transformToStringArray = (input: unknown): string[] => {
       .filter(item => item !== "");      // Remove empty strings
   }
 
-  // If it's a string, split by commas
+  // If it's a string, attempt to parse JSON-like list first
   if (typeof input === "string") {
+    const trimmed = input.trim();
+    // Detect brackets [] and try JSON.parse after replacing single quotes with double quotes
+    if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+      try {
+        const jsonReady = trimmed.replace(/'/g, '"');
+        const parsed = JSON.parse(jsonReady);
+        if (Array.isArray(parsed)) {
+          return parsed.map(item => String(item).trim()).filter(Boolean);
+        }
+      } catch {
+        // fall through to comma split
+      }
+    }
     return input
       .split(",")                       // Split by commas
       .map(item => item.trim())         // Trim each piece

@@ -1,6 +1,6 @@
 // Local type definitions to avoid import issues
 type Client = {
-  ClientId: string;
+  ClientID: string;
   ClientName: string;
   PriorityLevel: number;
   RequestedTaskIDs: string[];
@@ -99,7 +99,7 @@ export class ValidationEngine {
   private validateClients(): ValidationError[] {
     const errors: ValidationError[] = [];
     const clientIds = new Set<string>();
-    const requiredColumns = ["ClientId", "ClientName", "PriorityLevel"];
+    const requiredColumns = ["ClientID", "ClientName", "PriorityLevel"];
 
     this.clients.forEach((client, index) => {
       // Required columns check
@@ -117,18 +117,18 @@ export class ValidationEngine {
       });
 
       // Duplicate ID check
-      if (client.ClientId) {
-        if (clientIds.has(client.ClientId)) {
+      if (client.ClientID) {
+        if (clientIds.has(client.ClientID)) {
           errors.push({
             row: index,
-            column: "ClientId",
-            message: `Duplicate ClientID "${client.ClientId}" found`,
+            column: "ClientID",
+            message: `Duplicate ClientID "${client.ClientID}" found`,
             type: "critical",
             entityType: "client",
             severity: 5,
           });
         } else {
-          clientIds.add(client.ClientId);
+          clientIds.add(client.ClientID);
         }
       }
 
@@ -280,6 +280,7 @@ export class ValidationEngine {
     const requiredColumns = [
       "TaskID",
       "TaskName",
+      "Category",
       "Duration",
       "RequiredSkills",
     ];
