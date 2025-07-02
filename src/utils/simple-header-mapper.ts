@@ -39,6 +39,9 @@ Map these headers to expected fields:
 Headers: ${headers.join(', ')}
 Expected: ${SCHEMAS[detectedType].join(', ')}
 
+Handle case variations (e.g., CLIENTNAME -> ClientName, clientid -> ClientID).
+Map each input header to the exact expected field name with proper capitalization.
+
 Return ONLY JSON: {"Header": "ExpectedField"}
 `;
         
@@ -47,7 +50,10 @@ Return ONLY JSON: {"Header": "ExpectedField"}
         
         // Extract JSON from response
         const jsonMatch = responseText.match(/\{[^}]*\}/);
-        const mappings = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
+        let mappings = jsonMatch ? JSON.parse(jsonMatch[0]) : {};
+        
+        // Add manual fallback mappings for common case variations
+        mappings = addFallbackMappings(mappings, headers, detectedType);
         
         const unmapped = headers.filter(h => !mappings[h]);
         
@@ -57,4 +63,33 @@ Return ONLY JSON: {"Header": "ExpectedField"}
         console.warn('AI mapping failed:', error);
         return { mappings: {}, unmapped: headers, entityType: 'client' };
     }
+}
+
+/**
+ * Add fallback mappings for common case variations
+ */
+function addFallbackMappings(
+    existingMappings: Record<string, string>,
+    headers: string[],
+    entityType: 'client' | 'worker' | 'task'
+): Record<string, string> {
+    const mappings = { ...existingMappings };
+    const expectedFields = SCHEMAS[entityType];
+    
+    // For each header that isn't mapped yet
+    for (const header of headers) {
+        if (!mappings[header]) {
+            // Find a matching expected field (case-insensitive)
+            const normalizedHeader = header.toLowerCase();
+            const matchingField = expectedFields.find(field => 
+                field.toLowerCase() === normalizedHeader
+            );
+            
+            if (matchingField) {
+                mappings[header] = matchingField;
+            }
+        }
+    }
+    
+    return mappings;
 }

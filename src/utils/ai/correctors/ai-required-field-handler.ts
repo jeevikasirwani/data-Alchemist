@@ -39,6 +39,13 @@ export class AIRequiredFieldHandler {
                     role: 'system',
                     content: `You are a data completion expert. Analyze missing required fields and suggest appropriate values based on context and patterns in similar records.
 
+For ID fields ending in "ID": Generate format like C001, W001, T001 (based on entity type)
+For Name fields: Generate realistic business names like "Client Alpha", "Worker Beta", "Task Gamma" 
+For numeric fields: Use reasonable defaults based on field purpose
+For arrays: Use empty arrays [] as defaults
+
+NEVER suggest empty strings "" as values for name fields.
+
 Return JSON with:
 {
   "suggestion": "description of the correction",
@@ -83,13 +90,58 @@ Suggest an appropriate value for the missing field based on patterns in similar 
                     }
                 );
                 
-                suggestions.push({ error, suggestion: aiSuggestion });
-            } catch (error) {
-                console.error('Error processing required field error:', error);
+                // If AI suggests empty string for name fields, provide better fallback
+                if (aiSuggestion.correctedValue === '' && error.column.toLowerCase().includes('name')) {
+                    const fallbackSuggestion = this.generateFallbackForNameField(error.column, entityType, error.row);
+                    suggestions.push({ error, suggestion: fallbackSuggestion });
+                } else {
+                    suggestions.push({ error, suggestion: aiSuggestion });
+                }
+            } catch (err) {
+                console.error('Error processing required field error:', err);
+                // Provide fallback for common fields
+                const fallbackSuggestion = this.generateFallbackSuggestion(error.column, entityType, error.row);
+                if (fallbackSuggestion) {
+                    suggestions.push({ error, suggestion: fallbackSuggestion });
+                }
             }
         }
         
         return suggestions;
+    }
+
+    private generateFallbackForNameField(column: string, entityType: string, rowIndex: number): RequiredFieldSuggestion {
+        const entityPrefix = entityType.charAt(0).toUpperCase() + entityType.slice(1);
+        const nameValue = `${entityPrefix} ${String.fromCharCode(65 + (rowIndex % 26))}`; // A, B, C...
+        
+        return {
+            suggestion: `Generate ${column} using pattern`,
+            correctedValue: nameValue,
+            confidence: 0.7,
+            action: 'manual-review' as const,
+            explanation: `Generated placeholder name: ${nameValue}`
+        };
+    }
+
+    private generateFallbackSuggestion(column: string, entityType: string, rowIndex: number): RequiredFieldSuggestion | null {
+        const entityPrefix = entityType.charAt(0).toUpperCase();
+        const paddedIndex = String(rowIndex + 1).padStart(3, '0');
+        
+        if (column.toLowerCase().includes('id')) {
+            return {
+                suggestion: `Generate ${column} using pattern`,
+                correctedValue: `${entityPrefix}${paddedIndex}`,
+                confidence: 0.8,
+                action: 'auto-fix' as const,
+                explanation: `Generated ID: ${entityPrefix}${paddedIndex}`
+            };
+        }
+        
+        if (column.toLowerCase().includes('name')) {
+            return this.generateFallbackForNameField(column, entityType, rowIndex);
+        }
+        
+        return null;
     }
 
     private getContextData(data: any[], excludeIndex: number): any[] {

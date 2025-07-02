@@ -1,5 +1,5 @@
 export interface Client {
-    ClientId: string;
+    ClientID: string;
     ClientName: string;
     PriorityLevel: number;
     RequestedTaskIDs: string[];

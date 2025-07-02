@@ -13,7 +13,7 @@ type WorkerData = {
 };
 
 type Client = {
-  ClientId: string;
+  ClientID: string;
   ClientName: string;
   PriorityLevel: number;
   RequestedTaskIDs: string[];
@@ -65,15 +65,89 @@ type RawTaskData = {
 // Generic type for unknown CSV/Excel data
 type UnknownRecord = Record<string, unknown>;
 
+// Helper function to detect if first row contains headers
+const detectHeaders = (firstRow: any[], secondRow?: any[]): boolean => {
+  if (!firstRow || firstRow.length === 0) return false;
+  if (!secondRow || secondRow.length === 0) return true; // Assume headers if only one row
+  
+  // Check if first row contains mostly strings and second row contains different types
+  const firstRowTypes = firstRow.map(val => typeof val);
+  const secondRowTypes = secondRow.map(val => typeof val);
+  
+  // If first row has more strings and second row has more numbers, likely headers
+  const firstRowStrings = firstRowTypes.filter(t => t === 'string').length;
+  const firstRowNumbers = firstRowTypes.filter(t => t === 'number').length;
+  const secondRowNumbers = secondRowTypes.filter(t => t === 'number').length;
+  
+  // Heuristic: headers if first row is mostly strings and second row has numbers
+  return firstRowStrings > firstRowNumbers && secondRowNumbers > 0;
+};
+
+// Helper function to generate default headers for columns
+const generateDefaultHeaders = (columnCount: number): string[] => {
+  const defaultHeaders = [
+    'ClientID', 'ClientName', 'PriorityLevel', 'RequestedTaskIDs', 
+    'GroupTag', 'AttributesJSON', 'Column7', 'Column8', 'Column9', 'Column10'
+  ];
+  
+  const headers: string[] = [];
+  for (let i = 0; i < columnCount; i++) {
+    if (i < defaultHeaders.length) {
+      headers.push(defaultHeaders[i]);
+    } else {
+      headers.push(`Column${i + 1}`);
+    }
+  }
+  return headers;
+};
+
 export const parseCSV = (file: File): Promise<UnknownRecord[]> => {
   return new Promise((resolve, reject) => {
     Papa.parse(file, {
-      header: true,
+      header: false, // Parse without headers first to detect structure
       dynamicTyping: true,
-      skipEmptyLines: true,
+      skipEmptyLines: false, // Keep empty lines to process all data
       complete: (results) => {
-        console.log("CSV parse results:", results.data);
-        resolve(results.data as UnknownRecord[]);
+        console.log("Raw CSV parse results:", results.data);
+        
+        const rawData = results.data as any[][];
+        if (rawData.length === 0) {
+          resolve([]);
+          return;
+        }
+
+        // Check if first row looks like headers (contains strings vs numbers/data)
+        const firstRow = rawData[0];
+        const hasHeaders = detectHeaders(firstRow, rawData[1]);
+        
+        let headers: string[];
+        let dataRows: any[][];
+        
+        if (hasHeaders) {
+          headers = firstRow.map(h => String(h || '').trim());
+          dataRows = rawData.slice(1);
+          console.log("✅ Headers detected:", headers);
+        } else {
+          // Generate default headers based on data structure and inspect actual data
+          headers = generateDefaultHeaders(firstRow.length);
+          dataRows = rawData;
+          console.log("🔧 Generated default headers:", headers);
+          console.log("🔍 First few data rows for inspection:", dataRows.slice(0, 3));
+        }
+
+        // Convert to object format, including empty rows
+        const objectData = dataRows.map((row, index) => {
+          const obj: UnknownRecord = {};
+          headers.forEach((header, colIndex) => {
+            const cellValue = row[colIndex];
+            // Keep all values, even empty ones
+            obj[header] = cellValue === undefined || cellValue === null ? '' : cellValue;
+          });
+          return obj;
+        });
+
+        console.log("📊 Final processed data:", objectData);
+        resolve(objectData);
       },
       error: (error) => {
         reject(error);
@@ -147,11 +221,18 @@ const clientSchema = {
 
 // Transform raw data to Client interface
 export const transformClientData = (rawData: UnknownRecord[]): Client[] => {
-  return rawData.map((row: UnknownRecord) => {
+  return rawData.map((row: UnknownRecord, index: number) => {
     const clientRow = row as RawClientData;
+    
+    // Handle ClientName specifically - if empty, don't set to empty string
+    let clientName = String(clientRow.ClientName || "").trim();
+    if (!clientName || clientName === "null" || clientName === "undefined") {
+      clientName = ""; // Will be caught by validation and corrected
+    }
+    
     return {
-      ClientId: String(clientRow.ClientID || clientRow.ClientId || ""),
-      ClientName: String(clientRow.ClientName || ""),
+      ClientID: String(clientRow.ClientID || clientRow.ClientId || ""), // Use ClientID consistently
+      ClientName: clientName,
       PriorityLevel:
         typeof clientRow.PriorityLevel === "number"
           ? clientRow.PriorityLevel

@@ -157,7 +157,7 @@ export class AIDataCorrector {
             }
 
             // Otherwise fall back to generic suggestion, possibly using common value
-            return this.suggestGenericCorrection(error, pattern);
+            return this.suggestGenericCorrection(error, pattern, data);
         }
         
         switch (error.message) {
@@ -184,7 +184,7 @@ export class AIDataCorrector {
                 return this.suggestSlotsCorrection(error, pattern);
                 
             default:
-                return this.suggestGenericCorrection(error, pattern);
+                return this.suggestGenericCorrection(error, pattern, data);
         }
     }
 
@@ -198,17 +198,20 @@ export class AIDataCorrector {
             .map(row => row[error.column])
             .filter(id => id && id.toString().startsWith(prefix));
         
-        let nextId = 1;
-        while (existingIds.includes(`${prefix}${nextId}`)) {
+        // Start with row index + 1, then find next available ID
+        let nextId = error.row + 1;
+        const paddedId = () => `${prefix}${String(nextId).padStart(3, '0')}`;
+        while (existingIds.includes(paddedId())) {
             nextId++;
         }
         
+        const generatedId = paddedId();
         return {
             error,
-            suggestion: `Generate missing ${error.column} as "${prefix}${nextId}"`,
+            suggestion: `Generate missing ${error.column} as "${generatedId}"`,
             confidence: 0.9,
             action: 'auto-fix',
-            correctedValue: `${prefix}${nextId}`
+            correctedValue: generatedId
         };
     }
 
@@ -223,17 +226,20 @@ export class AIDataCorrector {
             .map(row => row[error.column])
             .filter(id => id && id.toString().startsWith(prefix));
         
-        let nextId = 1;
-        while (existingIds.includes(`${prefix}${nextId}`)) {
+        // Start with row index + 1, then find next available ID
+        let nextId = error.row + 1;
+        const paddedId = () => `${prefix}${String(nextId).padStart(3, '0')}`;
+        while (existingIds.includes(paddedId())) {
             nextId++;
         }
         
+        const generatedId = paddedId();
         return {
             error,
-            suggestion: `Replace duplicate ${error.column} "${duplicateValue}" with "${prefix}${nextId}"`,
+            suggestion: `Replace duplicate ${error.column} "${duplicateValue}" with "${generatedId}"`,
             confidence: 0.8,
             action: 'auto-fix',
-            correctedValue: `${prefix}${nextId}`
+            correctedValue: generatedId
         };
     }
 
@@ -310,14 +316,107 @@ export class AIDataCorrector {
         };
     }
 
-    private suggestGenericCorrection(error: ValidationError, pattern?: DataPattern): CorrectionSuggestion {
-        if (pattern?.commonValues && pattern.commonValues.length > 0) {
+    private suggestGenericCorrection(error: ValidationError, pattern?: DataPattern, data?: any[]): CorrectionSuggestion {
+        // Handle specific field types intelligently
+        const columnName = error.column.toLowerCase();
+        
+        // Generate proper names for name fields
+        if (columnName.includes('name') && data) {
+            // Try multiple strategies to find existing names
+            let existingNames: string[] = [];
+            
+            // Strategy 1: Look in the same column
+            existingNames = data
+                .map((row: any) => row[error.column])
+                .filter((name: any) => name && typeof name === 'string' && name.trim() && name !== 'INVALID' && name !== '')
+                .map((name: any) => String(name).trim());
+            
+            // Strategy 2: If no names found, look for any name-like fields in the data
+            if (existingNames.length === 0) {
+                const nameFields = ['ClientName', 'clientName', 'name', 'Name'];
+                for (const field of nameFields) {
+                    const names = data
+                        .map((row: any) => row[field])
+                        .filter((name: any) => name && typeof name === 'string' && name.trim() && name !== 'INVALID' && name !== '')
+                        .map((name: any) => String(name).trim());
+                    if (names.length > 0) {
+                        existingNames = names;
+                        break;
+                    }
+                }
+            }
+            
+            // Strategy 3: Look in all string fields that might be names
+            if (existingNames.length === 0 && data.length > 0) {
+                const firstRow = data[0];
+                for (const [key, value] of Object.entries(firstRow)) {
+                    if (typeof value === 'string' && value.trim() && 
+                        (value.includes('Corp') || value.includes('Industries') || value.includes('Ltd') || value.includes('Inc') || 
+                         value.includes('Company') || value.includes('Solutions') || value.includes('Group'))) {
+                        // Found a field with company-like names
+                        existingNames = data
+                            .map((row: any) => row[key])
+                            .filter((name: any) => name && typeof name === 'string' && name.trim())
+                            .map((name: any) => String(name).trim());
+                        break;
+                    }
+                }
+            }
+            
+            console.log('🔍 Debug: Found', existingNames.length, 'existing names:', existingNames.slice(0, 3));
+            
+            if (existingNames.length > 0) {
+                // Extract pattern from existing names
+                const namePattern = this.extractNamePattern(existingNames);
+                const suggestedName = this.generateSimilarName(namePattern, error.row, existingNames);
+                
+                return {
+                    error,
+                    suggestion: `Generate ${error.column} based on existing pattern: "${suggestedName}"`,
+                    confidence: 0.9,
+                    action: 'auto-fix',
+                    correctedValue: suggestedName
+                };
+            } else {
+                // Use realistic business names instead of generic "Client A"
+                const businessNames = [
+                    'Advanced Solutions', 'Global Enterprises', 'Premium Industries', 'Elite Corp',
+                    'Central Systems', 'United Technologies', 'Innovative Group', 'Strategic Partners',
+                    'Professional Services', 'Dynamic Solutions', 'Excellence Corp', 'Superior Industries'
+                ];
+                const selectedName = businessNames[error.row % businessNames.length];
+                
+                return {
+                    error,
+                    suggestion: `Generate realistic ${error.column}: "${selectedName}"`,
+                    confidence: 0.7,
+                    action: 'auto-fix',
+                    correctedValue: selectedName
+                };
+            }
+        }
+        
+        // Handle group/tag fields
+        if (columnName.includes('group') || columnName.includes('tag')) {
+            const defaultValue = columnName.includes('group') ? 'Enterprise' : 'General';
             return {
                 error,
-                suggestion: `Use common value: "${pattern.commonValues[0]}"`,
+                suggestion: `Set ${error.column} to "${defaultValue}"`,
+                confidence: 0.7,
+                action: 'auto-fix',
+                correctedValue: defaultValue
+            };
+        }
+        
+        // Use pattern-based suggestions for other fields
+        if (pattern?.commonValues && pattern.commonValues.length > 0) {
+            const bestValue = pattern.commonValues[0];
+            return {
+                error,
+                suggestion: `Use common value: "${bestValue}"`,
                 confidence: 0.4,
                 action: 'manual-review',
-                correctedValue: pattern.commonValues[0]
+                correctedValue: bestValue
             };
         }
         
@@ -478,5 +577,58 @@ export class AIDataCorrector {
         }
         
         return correctedData;
+    }
+
+    private extractNamePattern(existingNames: string[]): { prefixes: string[], suffixes: string[], patterns: string[] } {
+        const prefixes = new Set<string>();
+        const suffixes = new Set<string>();
+        const patterns = new Set<string>();
+        
+        existingNames.forEach(name => {
+            // Extract common patterns
+            const words = name.split(/\s+/);
+            if (words.length > 1) {
+                patterns.add('multi-word');
+                prefixes.add(words[0]);
+                suffixes.add(words[words.length - 1]);
+            } else {
+                patterns.add('single-word');
+            }
+        });
+        
+        return {
+            prefixes: Array.from(prefixes),
+            suffixes: Array.from(suffixes),
+            patterns: Array.from(patterns)
+        };
+    }
+
+    private generateSimilarName(namePattern: any, rowIndex: number, existingNames: string[]): string {
+        // Try to generate a name that follows the existing pattern
+        const { prefixes, suffixes, patterns } = namePattern;
+        
+        if (patterns.includes('multi-word') && prefixes.length > 0) {
+            // Generate based on multi-word pattern
+            const commonPrefixes = ['Global', 'National', 'International', 'Central', 'United', 'Advanced', 'Premium', 'Elite'];
+            const commonSuffixes = ['Corp', 'Industries', 'Solutions', 'Systems', 'Group', 'Ltd', 'Inc', 'Company'];
+            
+            // Use existing prefixes/suffixes if available, otherwise use common ones
+            const availablePrefixes = prefixes.length > 0 ? prefixes : commonPrefixes;
+            const availableSuffixes = suffixes.length > 0 ? suffixes : commonSuffixes;
+            
+            const prefix = availablePrefixes[rowIndex % availablePrefixes.length];
+            const suffix = availableSuffixes[rowIndex % availableSuffixes.length];
+            
+            const generatedName = `${prefix} ${suffix}`;
+            
+            // Ensure uniqueness
+            if (!existingNames.includes(generatedName)) {
+                return generatedName;
+            }
+        }
+        
+        // Fallback to simple numbered naming
+        const baseNames = ['Alpha Corp', 'Beta Industries', 'Gamma Solutions', 'Delta Systems', 'Epsilon Group'];
+        return baseNames[rowIndex % baseNames.length];
     }
 }

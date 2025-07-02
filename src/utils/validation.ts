@@ -104,7 +104,9 @@ export class ValidationEngine {
     this.clients.forEach((client, index) => {
       // Required columns check
       requiredColumns.forEach((column) => {
-        if (!client[column as keyof Client]) {
+        const value = client[column as keyof Client];
+        // Check for missing, empty, or whitespace-only values
+        if (!value || (typeof value === 'string' && value.trim() === '')) {
           errors.push({
             row: index,
             column,
