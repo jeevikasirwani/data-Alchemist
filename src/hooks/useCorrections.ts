@@ -1,72 +1,70 @@
 import { useState } from 'react';
-import { AIDataCorrector, CorrectionSuggestion } from '../utils/ai-data-corrector';
-import { createAIDataCorrector, EnhancedCorrectionSuggestion } from '../utils/ai';
-import { SmartAIDataCorrector, SmartCorrectionSuggestion } from '../utils/ai-data-corrector-smart';
+import { AIDataCorrectorSimplified, CorrectionSuggestion } from '../utils/ai-data-corrector-simplified';
 import { ValidationError } from '../utils/validation';
 import { EntityType, AppData, Client, Worker, Task } from '../types';
 
 export const useCorrections = () => {
     const [correctionSuggestions, setCorrectionSuggestions] = useState<CorrectionSuggestion[]>([]);
-    const [enhancedCorrections, setEnhancedCorrections] = useState<EnhancedCorrectionSuggestion[]>([]);
-    const [smartCorrections, setSmartCorrections] = useState<SmartCorrectionSuggestion[]>([]);
+    const [isGenerating, setIsGenerating] = useState(false);
 
-    const aiDataCorrector = new AIDataCorrector();
-    const aiDataCorrectorEnhanced = createAIDataCorrector();
-    const smartAICorrector = new SmartAIDataCorrector();
+    const aiCorrector = new AIDataCorrectorSimplified();
 
     const generateCorrections = async (data: AppData, validationErrors: ValidationError[]) => {
+        if (validationErrors.length === 0) {
+            setCorrectionSuggestions([]);
+            return;
+        }
+
+        setIsGenerating(true);
         try {
-            console.log('🤖 Generating AI corrections...');
+            console.log('🤖 Generating AI corrections for', validationErrors.length, 'errors...');
             
-            // Basic corrections - filter errors for each entity type
+            // Filter errors by entity type and generate suggestions
             const clientErrors = validationErrors.filter(e => e.entityType === 'client');
             const workerErrors = validationErrors.filter(e => e.entityType === 'worker');
             const taskErrors = validationErrors.filter(e => e.entityType === 'task');
 
             const allSuggestions: CorrectionSuggestion[] = [];
 
+            // Generate suggestions for each entity type
             if (clientErrors.length > 0) {
-                const clientSuggestions = await aiDataCorrector.suggestCorrections(data.clients, clientErrors, 'client', data);
-                allSuggestions.push(...clientSuggestions);
+                const suggestions = await aiCorrector.suggestCorrections(
+                    data.clients, 
+                    clientErrors, 
+                    'client', 
+                    data
+                );
+                allSuggestions.push(...suggestions);
             }
 
             if (workerErrors.length > 0) {
-                const workerSuggestions = await aiDataCorrector.suggestCorrections(data.workers, workerErrors, 'worker', data);
-                allSuggestions.push(...workerSuggestions);
+                const suggestions = await aiCorrector.suggestCorrections(
+                    data.workers, 
+                    workerErrors, 
+                    'worker', 
+                    data
+                );
+                allSuggestions.push(...suggestions);
             }
 
             if (taskErrors.length > 0) {
-                const taskSuggestions = await aiDataCorrector.suggestCorrections(data.tasks, taskErrors, 'task', data);
-                allSuggestions.push(...taskSuggestions);
+                const suggestions = await aiCorrector.suggestCorrections(
+                    data.tasks, 
+                    taskErrors, 
+                    'task', 
+                    data
+                );
+                allSuggestions.push(...suggestions);
             }
 
             setCorrectionSuggestions(allSuggestions);
-            console.log(`✅ Generated ${allSuggestions.length} basic corrections`);
-
-            // Enhanced corrections
-            const enhancedSuggestions = await aiDataCorrectorEnhanced.suggestCorrections([], validationErrors, 'client', data);
-            setEnhancedCorrections(enhancedSuggestions);
-            console.log(`✅ Generated ${enhancedSuggestions.length} enhanced corrections`);
-
-            // Smart AI corrections (if API key is available)
-            if (process.env.NEXT_PUBLIC_OPENAI_API_KEY) {
-                try {
-                    const smartSuggestions = await smartAICorrector.suggestCorrections(
-                        [...data.clients, ...data.workers, ...data.tasks], 
-                        validationErrors, 
-                        'client', 
-                        data
-                    );
-                    setSmartCorrections(smartSuggestions);
-                    console.log(`🤖 Generated ${smartSuggestions.length} smart AI corrections`);
-                } catch (error) {
-                    console.warn('Smart AI corrections unavailable:', error);
-                    setSmartCorrections([]);
-                }
-            }
+            console.log(`✅ Generated ${allSuggestions.length} AI correction suggestions`);
 
         } catch (error) {
             console.error('Error generating corrections:', error);
+            setCorrectionSuggestions([]);
+        } finally {
+            setIsGenerating(false);
         }
     };
 
@@ -78,88 +76,55 @@ export const useCorrections = () => {
         try {
             console.log('🔧 Applying correction:', suggestion);
             
-            // Validate suggestion has required data
-            if (!suggestion || !suggestion.error) {
-                console.error('Invalid suggestion: missing error data');
-                return;
-            }
-            
-            const entityType = suggestion.error.entityType as EntityType;
-            
-            // Skip system errors as they can't be corrected by editing data
+            // Skip system errors
             if (suggestion.error.entityType === 'system') {
                 console.log('Skipping system error correction');
                 return;
             }
             
-            // Get the corrected value from either correctedValue or parameters.newValue
-            const newValue = suggestion.correctedValue ?? suggestion.parameters?.newValue;
-            
-            if (newValue === undefined) {
-                console.error('No corrected value found in suggestion:', suggestion);
+            const entityType = suggestion.error.entityType as EntityType;
+
+            // Validate suggestion has required data
+            if (!suggestion || !suggestion.error || suggestion.correctedValue === undefined) {
+                console.error('Invalid suggestion: missing required data');
                 return;
             }
 
+            // Get current data for the entity type
+            let currentData: any[];
             switch (entityType) {
-                case 'client': {
-                    const currentData = data.clients;
-                    if (!currentData || suggestion.error.row < 0 || suggestion.error.row >= currentData.length) {
-                        console.error('Invalid client data or row index:', suggestion.error.row, 'max:', currentData?.length);
-                        return;
-                    }
-                    
-                    const updatedData = currentData.map((item, index) => {
-                        if (index === suggestion.error.row) {
-                            return { ...item, [suggestion.error.column]: newValue };
-                        }
-                        return item;
-                    });
-                    updateData(entityType, updatedData);
+                case 'client':
+                    currentData = data.clients;
                     break;
-                }
-                case 'worker': {
-                    const currentData = data.workers;
-                    if (!currentData || suggestion.error.row < 0 || suggestion.error.row >= currentData.length) {
-                        console.error('Invalid worker data or row index:', suggestion.error.row, 'max:', currentData?.length);
-                        return;
-                    }
-                    
-                    const updatedData = currentData.map((item, index) => {
-                        if (index === suggestion.error.row) {
-                            return { ...item, [suggestion.error.column]: newValue };
-                        }
-                        return item;
-                    });
-                    updateData(entityType, updatedData);
+                case 'worker':
+                    currentData = data.workers;
                     break;
-                }
-                case 'task': {
-                    const currentData = data.tasks;
-                    if (!currentData || suggestion.error.row < 0 || suggestion.error.row >= currentData.length) {
-                        console.error('Invalid task data or row index:', suggestion.error.row, 'max:', currentData?.length);
-                        return;
-                    }
-                    
-                    const updatedData = currentData.map((item, index) => {
-                        if (index === suggestion.error.row) {
-                            return { ...item, [suggestion.error.column]: newValue };
-                        }
-                        return item;
-                    });
-                    updateData(entityType, updatedData);
+                case 'task':
+                    currentData = data.tasks;
                     break;
-                }
                 default:
                     console.error('Unknown entity type:', entityType);
                     return;
             }
 
-            // Remove the applied suggestion
+            // Validate row index
+            if (suggestion.error.row < 0 || suggestion.error.row >= currentData.length) {
+                console.error('Invalid row index:', suggestion.error.row, 'max:', currentData.length);
+                return;
+            }
+
+            // Apply the correction using the AI corrector
+            const correctedData = await aiCorrector.applyCorrection(currentData, suggestion);
+            
+            // Update the data
+            updateData(entityType, correctedData);
+
+            // Remove the applied suggestion from the list
             setCorrectionSuggestions(prev => 
                 prev.filter(s => 
-                    s.error.row !== suggestion.error.row || 
-                    s.error.column !== suggestion.error.column || 
-                    s.error.entityType !== suggestion.error.entityType
+                    !(s.error.row === suggestion.error.row && 
+                      s.error.column === suggestion.error.column && 
+                      s.error.entityType === suggestion.error.entityType)
                 )
             );
 
@@ -169,185 +134,40 @@ export const useCorrections = () => {
         }
     };
 
-    const applyEnhancedCorrection = async (
-        suggestion: EnhancedCorrectionSuggestion,
-        data: AppData,
-        updateData: (entityType: EntityType, updatedData: Client[] | Worker[] | Task[]) => void
-    ) => {
-        try {
-            console.log('🔧 Applying enhanced correction:', suggestion);
-            
-            const entityType = suggestion.error.entityType as EntityType;
-            
-            // Get the corrected value
-            const newValue = suggestion.correctedValue;
-            
-            if (newValue === undefined) {
-                console.error('No corrected value found in enhanced suggestion:', suggestion);
-                return;
-            }
-
-            switch (entityType) {
-                case 'client': {
-                    const currentData = data.clients;
-                    if (!currentData || suggestion.error.row >= currentData.length) {
-                        console.error('Invalid client data or row index');
-                        return;
-                    }
-                    
-                    const updatedData = currentData.map((item, index) => {
-                        if (index === suggestion.error.row) {
-                            return { ...item, [suggestion.error.column]: newValue };
-                        }
-                        return item;
-                    });
-                    updateData(entityType, updatedData);
-                    break;
-                }
-                case 'worker': {
-                    const currentData = data.workers;
-                    if (!currentData || suggestion.error.row >= currentData.length) {
-                        console.error('Invalid worker data or row index');
-                        return;
-                    }
-                    
-                    const updatedData = currentData.map((item, index) => {
-                        if (index === suggestion.error.row) {
-                            return { ...item, [suggestion.error.column]: newValue };
-                        }
-                        return item;
-                    });
-                    updateData(entityType, updatedData);
-                    break;
-                }
-                case 'task': {
-                    const currentData = data.tasks;
-                    if (!currentData || suggestion.error.row >= currentData.length) {
-                        console.error('Invalid task data or row index');
-                        return;
-                    }
-                    
-                    const updatedData = currentData.map((item, index) => {
-                        if (index === suggestion.error.row) {
-                            return { ...item, [suggestion.error.column]: newValue };
-                        }
-                        return item;
-                    });
-                    updateData(entityType, updatedData);
-                    break;
-                }
-                default:
-                    console.error('Unknown entity type:', entityType);
-                    return;
-            }
-
-            // Remove the applied suggestion by comparing error properties
-            setEnhancedCorrections(prev => 
-                prev.filter(s => 
-                    s.error.row !== suggestion.error.row ||
-                    s.error.column !== suggestion.error.column ||
-                    s.error.entityType !== suggestion.error.entityType
-                )
-            );
-
-            console.log(`✅ Applied enhanced correction for ${entityType} row ${suggestion.error.row}`);
-        } catch (error) {
-            console.error('Error applying enhanced correction:', error);
-        }
+    const dismissSuggestion = (suggestion: CorrectionSuggestion) => {
+        setCorrectionSuggestions(prev => 
+            prev.filter(s => 
+                !(s.error.row === suggestion.error.row && 
+                  s.error.column === suggestion.error.column && 
+                  s.error.entityType === suggestion.error.entityType)
+            )
+        );
     };
 
-    const applySmartCorrection = async (
-        suggestion: SmartCorrectionSuggestion,
+    const clearAllSuggestions = () => {
+        setCorrectionSuggestions([]);
+    };
+
+    const applyAllAutoFixes = async (
         data: AppData,
         updateData: (entityType: EntityType, updatedData: Client[] | Worker[] | Task[]) => void
     ) => {
-        try {
-            console.log('🤖 Applying smart correction:', suggestion);
-            
-            const entityType = suggestion.error.entityType as EntityType;
-            const newValue = suggestion.correctedValue;
-            
-            if (newValue === undefined) {
-                console.error('No corrected value found in smart suggestion:', suggestion);
-                return;
-            }
-
-            switch (entityType) {
-                case 'client': {
-                    const currentData = data.clients;
-                    if (!currentData || suggestion.error.row >= currentData.length) {
-                        console.error('Invalid client data or row index');
-                        return;
-                    }
-                    
-                    const updatedData = currentData.map((item, index) => {
-                        if (index === suggestion.error.row) {
-                            return { ...item, [suggestion.error.column]: newValue };
-                        }
-                        return item;
-                    });
-                    updateData(entityType, updatedData);
-                    break;
-                }
-                case 'worker': {
-                    const currentData = data.workers;
-                    if (!currentData || suggestion.error.row >= currentData.length) {
-                        console.error('Invalid worker data or row index');
-                        return;
-                    }
-                    
-                    const updatedData = currentData.map((item, index) => {
-                        if (index === suggestion.error.row) {
-                            return { ...item, [suggestion.error.column]: newValue };
-                        }
-                        return item;
-                    });
-                    updateData(entityType, updatedData);
-                    break;
-                }
-                case 'task': {
-                    const currentData = data.tasks;
-                    if (!currentData || suggestion.error.row >= currentData.length) {
-                        console.error('Invalid task data or row index');
-                        return;
-                    }
-                    
-                    const updatedData = currentData.map((item, index) => {
-                        if (index === suggestion.error.row) {
-                            return { ...item, [suggestion.error.column]: newValue };
-                        }
-                        return item;
-                    });
-                    updateData(entityType, updatedData);
-                    break;
-                }
-                default:
-                    console.error('Unknown entity type:', entityType);
-                    return;
-            }
-
-            // Remove the applied suggestion
-            setSmartCorrections(prev => 
-                prev.filter(s => 
-                    s.error.row !== suggestion.error.row ||
-                    s.error.column !== suggestion.error.column ||
-                    s.error.entityType !== suggestion.error.entityType
-                )
-            );
-
-            console.log(`🤖 Applied smart correction for ${entityType} row ${suggestion.error.row}`);
-        } catch (error) {
-            console.error('Error applying smart correction:', error);
+        const autoFixSuggestions = correctionSuggestions.filter(s => s.action === 'auto-fix');
+        
+        for (const suggestion of autoFixSuggestions) {
+            await applyCorrection(suggestion, data, updateData);
+            // Small delay to prevent overwhelming the UI
+            await new Promise(resolve => setTimeout(resolve, 100));
         }
     };
 
     return {
         correctionSuggestions,
-        enhancedCorrections,
-        smartCorrections,
+        isGenerating,
         generateCorrections,
         applyCorrection,
-        applyEnhancedCorrection,
-        applySmartCorrection
+        dismissSuggestion,
+        clearAllSuggestions,
+        applyAllAutoFixes
     };
 }; 

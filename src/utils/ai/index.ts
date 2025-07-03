@@ -2,7 +2,7 @@
  * AI Module Exports - Clean and Organized
  * 
  * This index provides clean access to all AI functionality
- * using the new modular architecture.
+ * using the new simplified architecture.
  */
 
 // Core AI Infrastructure
@@ -28,12 +28,10 @@ export type { RequiredFieldSuggestion } from './correctors/ai-required-field-han
 // Main AI Services (Simplified)
 export { AIBroadValidatorSimple } from './ai-broad-validator-simple';
 export { AIQueryProcessorSimple } from './ai-query-processor-simple';
-export { AIDataCorrectorEnhanced } from './ai-data-corrector-enhanced';
 
 // Import classes for factory functions
 import { AIBroadValidatorSimple } from './ai-broad-validator-simple';
 import { AIQueryProcessorSimple } from './ai-query-processor-simple';
-import { AIDataCorrectorEnhanced } from './ai-data-corrector-enhanced';
 import { getPipelineStatus } from './ai-pipeline-manager';
 
 // Enhanced Types
@@ -46,10 +44,6 @@ export type {
     QueryIntent, 
     FilterCondition 
 } from './ai-query-processor-simple';
-
-export type { 
-    EnhancedCorrectionSuggestion 
-} from './ai-data-corrector-enhanced';
 
 /**
  * Convenience factory functions for easy initialization
@@ -65,11 +59,6 @@ export function createAIQueryProcessor() {
     return new AIQueryProcessorSimple();
 }
 
-// Create Enhanced Data Corrector
-export function createAIDataCorrector() {
-    return new AIDataCorrectorEnhanced();
-}
-
 /**
  * AI System Status Check
  */
@@ -77,10 +66,9 @@ export async function checkAISystemStatus() {
     try {
         const status = getPipelineStatus();
         return {
-            // available: true,
             generative: status.generative,
             embedding: status.embedding,
-            // message: 'AI system ready'
+            message: 'AI system ready'
         };
     } catch (error) {
         return {

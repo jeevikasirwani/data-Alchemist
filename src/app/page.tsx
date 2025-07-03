@@ -7,7 +7,7 @@ import RuleBuilder from '../components/RuleBuilder';
 import PriorityWeights from '../components/PriorityWeights';
 import ExportSystem from '../components/ExportSystem';
 import ValidationSummary from '../components/ValidationSummary';
-import CorrectionSuggestions from '../components/CorrectionSuggestions';
+import AICorrectionSuggestions from '../components/AICorrectionSuggestions';
 import QueryInterface from '../components/QueryInterface';
 
 // Custom hooks
@@ -18,9 +18,7 @@ import { useDataManagement } from '../hooks/useDataManagement';
 
 // Types
 import { EntityType, Client, Worker, Task } from '../types';
-import { CorrectionSuggestion } from '../utils/ai-data-corrector';
-import { EnhancedCorrectionSuggestion } from '../utils/ai';
-import { SmartCorrectionSuggestion } from '../utils/ai-data-corrector-smart';
+import { CorrectionSuggestion } from '../utils/ai-data-corrector-simplified';
 
 export default function Home() {
     // All hooks for modular functionality
@@ -48,6 +46,8 @@ export default function Home() {
                 dataManagement.data.workers.length > 0 ||
                 dataManagement.data.tasks.length > 0)) {
             corrections.generateCorrections(dataManagement.getAppData(), dataManagement.data.validationErrors);
+        } else {
+            corrections.clearAllSuggestions();
         }
     }, [dataManagement.data.validationErrors]);
 
@@ -61,12 +61,12 @@ export default function Home() {
         await corrections.applyCorrection(suggestion, dataManagement.getAppData(), handleDataChange);
     };
 
-    const handleApplyEnhancedCorrection = async (suggestion: EnhancedCorrectionSuggestion) => {
-        await corrections.applyEnhancedCorrection(suggestion, dataManagement.getAppData(), handleDataChange);
+    const handleDismissSuggestion = (suggestion: CorrectionSuggestion) => {
+        corrections.dismissSuggestion(suggestion);
     };
 
-    const handleApplySmartCorrection = async (suggestion: SmartCorrectionSuggestion) => {
-        await corrections.applySmartCorrection(suggestion, dataManagement.getAppData(), handleDataChange);
+    const handleApplyAllAutoFixes = async () => {
+        await corrections.applyAllAutoFixes(dataManagement.getAppData(), handleDataChange);
     };
 
     const hasData = () => {
@@ -131,15 +131,53 @@ export default function Home() {
                     />
                 )}
 
-                {/* AI Correction Suggestions */}
-                <CorrectionSuggestions
-                    correctionSuggestions={corrections.correctionSuggestions}
-                    enhancedCorrections={corrections.enhancedCorrections}
-                    smartCorrections={corrections.smartCorrections}
-                    onApplyCorrection={handleApplyCorrection}
-                    onApplyEnhancedCorrection={handleApplyEnhancedCorrection}
-                    onApplySmartCorrection={handleApplySmartCorrection}
-                />
+                {/* AI Correction Suggestions - NEW SIMPLIFIED VERSION */}
+                {corrections.correctionSuggestions.length > 0 && (
+                    <div className="mb-6">
+                        {/* Quick action bar */}
+                        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <span className="text-blue-800 font-medium">
+                                    Found {corrections.correctionSuggestions.length} AI suggestions
+                                </span>
+                                <span className="text-sm text-blue-600">
+                                    ({corrections.correctionSuggestions.filter(s => s.action === 'auto-fix').length} auto-fixable)
+                                </span>
+                            </div>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={handleApplyAllAutoFixes}
+                                    disabled={corrections.isGenerating || corrections.correctionSuggestions.filter(s => s.action === 'auto-fix').length === 0}
+                                    className="px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition-colors"
+                                >
+                                    Apply All Auto-fixes
+                                </button>
+                                <button
+                                    onClick={corrections.clearAllSuggestions}
+                                    className="px-4 py-2 bg-gray-600 text-white text-sm font-medium rounded-lg hover:bg-gray-700 transition-colors"
+                                >
+                                    Dismiss All
+                                </button>
+                            </div>
+                        </div>
+
+                        <AICorrectionSuggestions
+                            suggestions={corrections.correctionSuggestions}
+                            onApplyCorrection={handleApplyCorrection}
+                            onDismiss={handleDismissSuggestion}
+                        />
+                    </div>
+                )}
+
+                {/* Loading state for AI corrections */}
+                {corrections.isGenerating && (
+                    <div className="mb-6 p-6 bg-white border border-gray-200 rounded-xl shadow-sm">
+                        <div className="flex items-center justify-center gap-3">
+                            <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                            <span className="text-gray-700">🤖 AI is analyzing your data and generating corrections...</span>
+                        </div>
+                    </div>
+                )}
 
                 {/* Main Data Tabs */}
                 {hasData() && (
