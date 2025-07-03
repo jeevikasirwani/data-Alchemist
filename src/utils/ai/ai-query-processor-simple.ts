@@ -1,4 +1,15 @@
-import { generateChatCompletion, ChatMessage } from './ai-chat-completion';
+import { generateWithAI, parseAIResponse } from '../ai-helper';
+
+interface ChatMessage {
+    role: 'system' | 'user';
+    content: string;
+}
+
+async function generateChatCompletion(messages: ChatMessage[]): Promise<{ choices: [{ message: { content: string } }] }> {
+    const prompt = messages.map(m => `${m.role}: ${m.content}`).join('\n\n');
+    const response = await generateWithAI(prompt);
+    return { choices: [{ message: { content: response } }] };
+}
 
 export interface QueryIntent {
     action: 'filter' | 'search' | 'count' | 'find';

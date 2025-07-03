@@ -2,7 +2,7 @@
  * Minimal AI Header Mapper - Just what you need
  */
 
-import { generateChatCompletion } from './ai/ai-chat-completion';
+import { generateWithAI } from './ai-helper';
 
 
 export interface MappingResult {
@@ -29,8 +29,8 @@ Headers: ${headers.join(', ')}
 Is this client, worker, or task data? Answer with just one word.
 `;
         
-        const typeResponse = await generateChatCompletion([{ role: 'user', content: typePrompt }]);
-        const entityType = typeResponse.choices[0].message.content?.toLowerCase().trim() || 'client';
+        const typeResponse = await generateWithAI(typePrompt);
+        const entityType = typeResponse.toLowerCase().trim() || 'client';
         const detectedType = ['client', 'worker', 'task'].includes(entityType) ? entityType as 'client' | 'worker' | 'task' : 'client';
         
         // Let AI map the headers
@@ -45,8 +45,7 @@ Map each input header to the exact expected field name with proper capitalizatio
 Return ONLY JSON: {"Header": "ExpectedField"}
 `;
         
-        const mapResponse = await generateChatCompletion([{ role: 'user', content: mapPrompt }]);
-        const responseText = mapResponse.choices[0].message.content || '';
+        const responseText = await generateWithAI(mapPrompt);
         
         // Extract JSON from response
         const jsonMatch = responseText.match(/\{[^}]*\}/);

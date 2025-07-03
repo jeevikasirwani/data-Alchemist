@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { FaMagic, FaLightbulb, FaCheck, FaSpinner } from 'react-icons/fa';
+import { FaMagic, FaLightbulb, FaCheck, FaSpinner, FaRobot, FaBrain } from 'react-icons/fa';
 import { BusinessRule } from './RuleBuilder';
 import { AppData } from '../types';
+import { generateWithAI, naturalLanguageToRule, generateRuleRecommendations, isAIAvailable } from '../utils/ai-helper';
 
 interface NaturalLanguageRulesProps {
     onRuleGenerated: (rule: BusinessRule) => void;
@@ -14,6 +15,8 @@ export default function NaturalLanguageRules({ onRuleGenerated, existingRules, a
     const [isProcessing, setIsProcessing] = useState(false);
     const [suggestion, setSuggestion] = useState<BusinessRule | null>(null);
     const [confidence, setConfidence] = useState(0);
+    const [aiRecommendations, setAiRecommendations] = useState<string[]>([]);
+    const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
 
     // Example natural language patterns
     const examplePatterns = [
@@ -39,11 +42,40 @@ export default function NaturalLanguageRules({ onRuleGenerated, existingRules, a
         }
     ];
 
-    // Pattern recognition and rule parsing
+    // Enhanced pattern recognition with AI support
     const parseNaturalLanguage = async (input: string): Promise<{ rule: BusinessRule | null, confidence: number }> => {
         const cleanInput = input.toLowerCase().trim();
         
-        // Simple pattern matching (in a real app, this would use NLP/AI)
+        // First try AI-powered parsing
+        try {
+            const aiAvailable = await isAIAvailable();
+            if (aiAvailable) {
+                const aiRule = await naturalLanguageToRule(input);
+                if (aiRule && aiRule.name && aiRule.field !== 'unknown') {
+                    return {
+                        rule: {
+                            id: `rule_${Date.now()}`,
+                            type: 'patternMatch', // Use patternMatch as fallback for AI-generated rules
+                            name: aiRule.name,
+                            enabled: true,
+                            priority: 3,
+                            parameters: {
+                                regex: aiRule.condition,
+                                template: aiRule.message,
+                                parameters: { field: aiRule.field },
+                                description: aiRule.description,
+                                enforcement: 'strict'
+                            }
+                        },
+                        confidence: 0.85
+                    };
+                }
+            }
+        } catch (error) {
+            console.warn('AI parsing failed, falling back to pattern matching:', error);
+        }
+        
+        // Fallback to pattern matching
         
         // Co-execution pattern: "tasks X and Y must run together"
         const coRunPattern = /tasks?\s+([\w-]+)\s+and\s+([\w-]+)\s+must\s+run\s+together/i;
@@ -170,6 +202,24 @@ export default function NaturalLanguageRules({ onRuleGenerated, existingRules, a
         }
     };
 
+    const generateAIRecommendations = async () => {
+        if (appData.clients.length === 0 && appData.workers.length === 0 && appData.tasks.length === 0) {
+            return;
+        }
+
+        setIsLoadingRecommendations(true);
+        try {
+            const allData = [...appData.clients, ...appData.workers, ...appData.tasks];
+            const recommendations = await generateRuleRecommendations(allData);
+            setAiRecommendations(recommendations);
+        } catch (error) {
+            console.warn('Failed to generate AI recommendations:', error);
+            setAiRecommendations([]);
+        } finally {
+            setIsLoadingRecommendations(false);
+        }
+    };
+
     const getDataSuggestions = () => {
         const suggestions = [];
         
@@ -229,12 +279,50 @@ export default function NaturalLanguageRules({ onRuleGenerated, existingRules, a
                     </button>
                 </div>
 
+                {/* AI-Powered Rule Recommendations */}
+                <div className="mb-6">
+                    <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                            <FaBrain className="text-purple-600" />
+                            AI Rule Recommendations
+                        </h4>
+                        <button
+                            onClick={generateAIRecommendations}
+                            disabled={isLoadingRecommendations || (appData.clients.length === 0 && appData.workers.length === 0 && appData.tasks.length === 0)}
+                            className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700 disabled:bg-gray-400 flex items-center gap-2 transition-all duration-200"
+                        >
+                            {isLoadingRecommendations ? <FaSpinner className="animate-spin" /> : <FaRobot />}
+                            {isLoadingRecommendations ? 'Analyzing...' : 'Get AI Suggestions'}
+                        </button>
+                    </div>
+                    
+                    {aiRecommendations.length > 0 && (
+                        <div className="p-4 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl">
+                            <h5 className="font-semibold text-purple-900 mb-3 flex items-center gap-2">
+                                <FaBrain />
+                                AI Suggested Rules
+                            </h5>
+                            <div className="space-y-2">
+                                {aiRecommendations.map((recommendation, index) => (
+                                    <button
+                                        key={index}
+                                        onClick={() => setNaturalInput(recommendation)}
+                                        className="w-full text-left p-3 bg-white border border-purple-200 rounded-lg hover:bg-purple-50 transition-all duration-200 text-sm text-purple-800"
+                                    >
+                                        {recommendation}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
                 {/* Data-Based Suggestions */}
                 {getDataSuggestions().length > 0 && (
                     <div className="mb-6">
                         <h4 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
                             <span>💡</span>
-                            Suggestions based on your data:
+                            Quick suggestions based on your data:
                         </h4>
                         <div className="flex flex-wrap gap-3">
                             {getDataSuggestions().map((suggestion, index) => (
@@ -339,7 +427,7 @@ export default function NaturalLanguageRules({ onRuleGenerated, existingRules, a
 
             {/* Statistics */}
             <div className="pt-6 border-t border-gray-200 text-center">
-                <div className="grid grid-cols-3 gap-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                     <div className="p-4 bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl border border-purple-200">
                         <div className="text-2xl font-bold text-purple-600">{existingRules.length}</div>
                         <div className="text-gray-600 font-medium">Total Rules</div>
@@ -352,7 +440,13 @@ export default function NaturalLanguageRules({ onRuleGenerated, existingRules, a
                         <div className="text-2xl font-bold text-blue-600">
                             {getDataSuggestions().length}
                         </div>
-                        <div className="text-gray-600 font-medium">Data Suggestions</div>
+                        <div className="text-gray-600 font-medium">Quick Suggestions</div>
+                    </div>
+                    <div className="p-4 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl border border-indigo-200">
+                        <div className="text-2xl font-bold text-indigo-600">
+                            {aiRecommendations.length}
+                        </div>
+                        <div className="text-gray-600 font-medium">AI Recommendations</div>
                     </div>
                 </div>
             </div>

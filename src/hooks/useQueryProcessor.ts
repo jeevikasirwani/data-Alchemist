@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { createAIQueryProcessor, QueryResult } from '../utils/ai';
+import { AIQueryProcessorSimple as createAIQueryProcessor, QueryResult } from '../utils/ai/ai-query-processor-simple';
 
 interface AppData {
     clients: any[];
@@ -13,7 +13,7 @@ export const useQueryProcessor = () => {
     const [showQueryInterface, setShowQueryInterface] = useState(false);
     const [isProcessingQuery, setIsProcessingQuery] = useState(false);
 
-    const aiQueryProcessor = createAIQueryProcessor();
+    const aiQueryProcessor = new createAIQueryProcessor();
 
     const handleNaturalQuery = async (data: AppData) => {
         if (!naturalQuery.trim()) return;
