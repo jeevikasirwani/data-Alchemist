@@ -44,7 +44,7 @@ export default function DataGrid({ data, entityType, onDataChange, validationErr
 
     const handleCellEdit = (rowIndex: number, column: string, value: string) => {
         const updatedData = [...data];
-        
+
         // Type-safe update based on entity type
         switch (entityType) {
             case 'client': {
@@ -117,15 +117,14 @@ export default function DataGrid({ data, entityType, onDataChange, validationErr
                                         const error = getCellError(rowIndex, header);
                                         const isEditing = editingCell?.row === rowIndex && editingCell?.column === header;
                                         const cellValue = getCellValue(row, header);
-                                        
+
                                         return (
-                                            <td 
-                                                key={header} 
-                                                className={`px-6 py-4 whitespace-nowrap text-sm transition-all duration-200 ${
-                                                    error 
-                                                        ? 'bg-red-50 border-l-4 border-red-400' 
-                                                        : 'border-l-4 border-transparent hover:border-blue-200'
-                                                }`}
+                                            <td
+                                                key={header}
+                                                className={`px-6 py-4 whitespace-nowrap text-sm transition-all duration-200 ${error
+                                                    ? 'bg-red-50 border-l-4 border-red-400'
+                                                    : 'border-l-4 border-transparent hover:border-blue-200'
+                                                    }`}
                                                 onClick={() => startEditing(rowIndex, header, cellValue)}
                                             >
                                                 {isEditing ? (
@@ -188,3 +187,11 @@ export default function DataGrid({ data, entityType, onDataChange, validationErr
     );
 }
 
+// 1. For each ROW in data:
+//    └── 2. For each COLUMN (header):
+//        ├── 3. Check if this cell has validation error
+//        ├── 4. Check if user is editing this cell  
+//        ├── 5. Get the value for this cell
+//        └── 6. Render the cell:
+//            ├── If editing: Show input field
+//            └── If not editing: Show value + error (if any)

@@ -19,7 +19,7 @@ export default function QuickFix({ errors, data, availableTasks, onDataChange }:
     const [replacementTaskId, setReplacementTaskId] = useState('');
 
     // Filter only missing task reference errors
-    const missingTaskErrors = errors.filter(error => 
+    const missingTaskErrors = errors.filter(error =>
         error.message.includes('not found in tasks')
     );
 
@@ -39,34 +39,34 @@ export default function QuickFix({ errors, data, availableTasks, onDataChange }:
     const fixByReplacing = (rowIndex: number, oldTaskId: string, newTaskId: string) => {
         const updatedData = [...data];
         const row = { ...updatedData[rowIndex] };
-        
+
         if (Array.isArray(row.RequestedTaskIDs)) {
-            row.RequestedTaskIDs = row.RequestedTaskIDs.map((taskId: string) => 
+            row.RequestedTaskIDs = row.RequestedTaskIDs.map((taskId: string) =>
                 taskId === oldTaskId ? newTaskId : taskId
             );
         }
-        
+
         updatedData[rowIndex] = row;
         onDataChange(updatedData, true); // immediate validation
         setFixingRow(null);
         setReplacementTaskId('');
-        
+
         console.log(`Fixed: Replaced '${oldTaskId}' with '${newTaskId}' in row ${rowIndex}`);
     };
 
     const fixByRemoving = (rowIndex: number, taskIdToRemove: string) => {
         const updatedData = [...data];
         const row = { ...updatedData[rowIndex] };
-        
+
         if (Array.isArray(row.RequestedTaskIDs)) {
-            row.RequestedTaskIDs = row.RequestedTaskIDs.filter((taskId: string) => 
+            row.RequestedTaskIDs = row.RequestedTaskIDs.filter((taskId: string) =>
                 taskId !== taskIdToRemove
             );
         }
-        
+
         updatedData[rowIndex] = row;
         onDataChange(updatedData, true); // immediate validation
-        
+
         console.log(`Fixed: Removed '${taskIdToRemove}' from row ${rowIndex}`);
     };
 
@@ -85,19 +85,19 @@ export default function QuickFix({ errors, data, availableTasks, onDataChange }:
     const calculateSimilarity = (str1: string, str2: string): number => {
         const longer = str1.length > str2.length ? str1 : str2;
         const shorter = str1.length > str2.length ? str2 : str1;
-        
+
         if (longer.length === 0) return 1.0;
-        
+
         const editDistance = getEditDistance(longer, shorter);
         return (longer.length - editDistance) / longer.length;
     };
 
     const getEditDistance = (str1: string, str2: string): number => {
         const matrix = Array(str2.length + 1).fill(null).map(() => Array(str1.length + 1).fill(null));
-        
+
         for (let i = 0; i <= str1.length; i++) matrix[0][i] = i;
         for (let j = 0; j <= str2.length; j++) matrix[j][0] = j;
-        
+
         for (let j = 1; j <= str2.length; j++) {
             for (let i = 1; i <= str1.length; i++) {
                 const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
@@ -108,7 +108,7 @@ export default function QuickFix({ errors, data, availableTasks, onDataChange }:
                 );
             }
         }
-        
+
         return matrix[str2.length][str1.length];
     };
 
@@ -163,7 +163,7 @@ export default function QuickFix({ errors, data, availableTasks, onDataChange }:
                             {isFixing && (
                                 <div className="mt-4 p-5 bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl border border-gray-200">
                                     <h5 className="text-sm font-semibold mb-4 text-gray-800">Replace with:</h5>
-                                    
+
                                     {/* Similar tasks suggestions */}
                                     {similarTasks.length > 0 && (
                                         <div className="mb-4">
@@ -173,11 +173,10 @@ export default function QuickFix({ errors, data, availableTasks, onDataChange }:
                                                     <button
                                                         key={idx}
                                                         onClick={() => setReplacementTaskId(item.taskId)}
-                                                        className={`px-3 py-2 text-sm rounded-lg font-medium transition-all duration-200 ${
-                                                            replacementTaskId === item.taskId
+                                                        className={`px-3 py-2 text-sm rounded-lg font-medium transition-all duration-200 ${replacementTaskId === item.taskId
                                                                 ? 'bg-blue-500 text-white shadow-md'
                                                                 : 'bg-blue-100 text-blue-800 hover:bg-blue-200 hover:shadow-sm'
-                                                        }`}
+                                                            }`}
                                                     >
                                                         {item.taskId} ({(item.similarity * 100).toFixed(0)}%)
                                                     </button>
