@@ -1,25 +1,31 @@
 import React from 'react';
 import { CorrectionSuggestion } from '../utils/ai-data-corrector';
 import { EnhancedCorrectionSuggestion } from '../utils/ai';
+import { SmartCorrectionSuggestion } from '../utils/ai-data-corrector-smart';
 
 interface CorrectionSuggestionsProps {
     correctionSuggestions: CorrectionSuggestion[];
     enhancedCorrections: EnhancedCorrectionSuggestion[];
+    smartCorrections: SmartCorrectionSuggestion[];
     onApplyCorrection: (suggestion: CorrectionSuggestion) => void;
     onApplyEnhancedCorrection: (suggestion: EnhancedCorrectionSuggestion) => void;
+    onApplySmartCorrection: (suggestion: SmartCorrectionSuggestion) => void;
 }
 
 const CorrectionSuggestions: React.FC<CorrectionSuggestionsProps> = ({
     correctionSuggestions,
     enhancedCorrections,
+    smartCorrections,
     onApplyCorrection,
-    onApplyEnhancedCorrection
+    onApplyEnhancedCorrection,
+    onApplySmartCorrection
 }) => {
-    const totalSuggestions = correctionSuggestions.length + enhancedCorrections.length;
+    const totalSuggestions = correctionSuggestions.length + enhancedCorrections.length + smartCorrections.length;
     
     console.log('🔧 CorrectionSuggestions rendered:', { 
         basicSuggestions: correctionSuggestions.length, 
         enhancedSuggestions: enhancedCorrections.length,
+        smartSuggestions: smartCorrections.length,
         totalSuggestions 
     });
 
@@ -85,6 +91,85 @@ const CorrectionSuggestions: React.FC<CorrectionSuggestionsProps> = ({
                                         className="ml-4 px-6 py-3 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-all duration-200 shadow-sm hover:shadow-md"
                                     >
                                         Apply
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Smart AI Corrections */}
+            {smartCorrections.length > 0 && (
+                <div className="mb-6">
+                    <h4 className="font-semibold text-gray-800 mb-4 text-lg flex items-center gap-2">
+                        <span className="text-xl">🤖</span>
+                        Smart AI Corrections (LLM-Powered)
+                    </h4>
+                    <div className="space-y-4">
+                        {smartCorrections.map((suggestion, index) => (
+                            <div key={index} className="p-5 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl shadow-sm">
+                                <div className="flex items-start justify-between">
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-3 mb-3">
+                                            <span className="text-sm font-semibold text-emerald-800 px-3 py-1 bg-emerald-200 rounded-lg">
+                                                {suggestion.error.entityType} - Row {suggestion.error.row}
+                                            </span>
+                                            <span className="text-xs bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full font-medium">
+                                                {suggestion.error.column}
+                                            </span>
+                                        </div>
+                                        
+                                        <div className="space-y-3">
+                                            <p className="text-sm text-gray-700">
+                                                <strong className="text-gray-900">Issue:</strong> {suggestion.error.message}
+                                            </p>
+                                            <p className="text-sm text-emerald-700">
+                                                <strong className="text-emerald-900">AI Suggestion:</strong> {suggestion.suggestion}
+                                            </p>
+                                            {suggestion.reasoning && (
+                                                <p className="text-sm text-blue-600 bg-blue-50 p-3 rounded-lg border border-blue-200">
+                                                    <strong className="text-blue-800">AI Reasoning:</strong> {suggestion.reasoning}
+                                                </p>
+                                            )}
+                                            {suggestion.businessContext && (
+                                                <p className="text-sm text-purple-600 bg-purple-50 p-3 rounded-lg border border-purple-200">
+                                                    <strong className="text-purple-800">Business Context:</strong> {suggestion.businessContext}
+                                                </p>
+                                            )}
+                                            {suggestion.correctedValue && (
+                                                <p className="text-sm text-green-700 bg-green-50 p-3 rounded-lg border border-green-200">
+                                                    <strong className="text-green-900">Proposed value:</strong> {String(suggestion.correctedValue)}
+                                                </p>
+                                            )}
+                                            {suggestion.alternatives && suggestion.alternatives.length > 0 && (
+                                                <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                                                    <strong className="text-gray-800">Alternatives:</strong> {suggestion.alternatives.join(', ')}
+                                                </p>
+                                            )}
+                                        </div>
+                                        
+                                        <div className="flex items-center gap-3 mt-4">
+                                            <span className="text-xs text-gray-500 font-medium">
+                                                Confidence: {(suggestion.confidence * 100).toFixed(0)}%
+                                            </span>
+                                            <span className={`text-xs px-3 py-1 rounded-full font-medium ${
+                                                suggestion.action === 'auto-fix' 
+                                                    ? 'bg-green-100 text-green-700 border border-green-200' 
+                                                    : 'bg-yellow-100 text-yellow-700 border border-yellow-200'
+                                            }`}>
+                                                {suggestion.action}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            console.log('🤖 Smart Apply button clicked for suggestion:', suggestion);
+                                            onApplySmartCorrection(suggestion);
+                                        }}
+                                        className="ml-4 px-6 py-3 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-all duration-200 shadow-sm hover:shadow-md"
+                                    >
+                                        Apply Smart Fix
                                     </button>
                                 </div>
                             </div>

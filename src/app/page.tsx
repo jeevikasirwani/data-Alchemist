@@ -20,6 +20,7 @@ import { useDataManagement } from '../hooks/useDataManagement';
 import { EntityType, Client, Worker, Task } from '../types';
 import { CorrectionSuggestion } from '../utils/ai-data-corrector';
 import { EnhancedCorrectionSuggestion } from '../utils/ai';
+import { SmartCorrectionSuggestion } from '../utils/ai-data-corrector-smart';
 
 export default function Home() {
     // All hooks for modular functionality
@@ -62,6 +63,10 @@ export default function Home() {
 
     const handleApplyEnhancedCorrection = async (suggestion: EnhancedCorrectionSuggestion) => {
         await corrections.applyEnhancedCorrection(suggestion, dataManagement.getAppData(), handleDataChange);
+    };
+
+    const handleApplySmartCorrection = async (suggestion: SmartCorrectionSuggestion) => {
+        await corrections.applySmartCorrection(suggestion, dataManagement.getAppData(), handleDataChange);
     };
 
     const hasData = () => {
@@ -130,8 +135,10 @@ export default function Home() {
                 <CorrectionSuggestions
                     correctionSuggestions={corrections.correctionSuggestions}
                     enhancedCorrections={corrections.enhancedCorrections}
+                    smartCorrections={corrections.smartCorrections}
                     onApplyCorrection={handleApplyCorrection}
                     onApplyEnhancedCorrection={handleApplyEnhancedCorrection}
+                    onApplySmartCorrection={handleApplySmartCorrection}
                 />
 
                 {/* Main Data Tabs */}

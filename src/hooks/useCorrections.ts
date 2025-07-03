@@ -1,15 +1,18 @@
 import { useState } from 'react';
 import { AIDataCorrector, CorrectionSuggestion } from '../utils/ai-data-corrector';
 import { createAIDataCorrector, EnhancedCorrectionSuggestion } from '../utils/ai';
+import { SmartAIDataCorrector, SmartCorrectionSuggestion } from '../utils/ai-data-corrector-smart';
 import { ValidationError } from '../utils/validation';
 import { EntityType, AppData, Client, Worker, Task } from '../types';
 
 export const useCorrections = () => {
     const [correctionSuggestions, setCorrectionSuggestions] = useState<CorrectionSuggestion[]>([]);
     const [enhancedCorrections, setEnhancedCorrections] = useState<EnhancedCorrectionSuggestion[]>([]);
+    const [smartCorrections, setSmartCorrections] = useState<SmartCorrectionSuggestion[]>([]);
 
     const aiDataCorrector = new AIDataCorrector();
     const aiDataCorrectorEnhanced = createAIDataCorrector();
+    const smartAICorrector = new SmartAIDataCorrector();
 
     const generateCorrections = async (data: AppData, validationErrors: ValidationError[]) => {
         try {
@@ -44,6 +47,23 @@ export const useCorrections = () => {
             const enhancedSuggestions = await aiDataCorrectorEnhanced.suggestCorrections([], validationErrors, 'client', data);
             setEnhancedCorrections(enhancedSuggestions);
             console.log(`✅ Generated ${enhancedSuggestions.length} enhanced corrections`);
+
+            // Smart AI corrections (if API key is available)
+            if (process.env.NEXT_PUBLIC_OPENAI_API_KEY) {
+                try {
+                    const smartSuggestions = await smartAICorrector.suggestCorrections(
+                        [...data.clients, ...data.workers, ...data.tasks], 
+                        validationErrors, 
+                        'client', 
+                        data
+                    );
+                    setSmartCorrections(smartSuggestions);
+                    console.log(`🤖 Generated ${smartSuggestions.length} smart AI corrections`);
+                } catch (error) {
+                    console.warn('Smart AI corrections unavailable:', error);
+                    setSmartCorrections([]);
+                }
+            }
 
         } catch (error) {
             console.error('Error generating corrections:', error);
@@ -236,11 +256,98 @@ export const useCorrections = () => {
         }
     };
 
+    const applySmartCorrection = async (
+        suggestion: SmartCorrectionSuggestion,
+        data: AppData,
+        updateData: (entityType: EntityType, updatedData: Client[] | Worker[] | Task[]) => void
+    ) => {
+        try {
+            console.log('🤖 Applying smart correction:', suggestion);
+            
+            const entityType = suggestion.error.entityType as EntityType;
+            const newValue = suggestion.correctedValue;
+            
+            if (newValue === undefined) {
+                console.error('No corrected value found in smart suggestion:', suggestion);
+                return;
+            }
+
+            switch (entityType) {
+                case 'client': {
+                    const currentData = data.clients;
+                    if (!currentData || suggestion.error.row >= currentData.length) {
+                        console.error('Invalid client data or row index');
+                        return;
+                    }
+                    
+                    const updatedData = currentData.map((item, index) => {
+                        if (index === suggestion.error.row) {
+                            return { ...item, [suggestion.error.column]: newValue };
+                        }
+                        return item;
+                    });
+                    updateData(entityType, updatedData);
+                    break;
+                }
+                case 'worker': {
+                    const currentData = data.workers;
+                    if (!currentData || suggestion.error.row >= currentData.length) {
+                        console.error('Invalid worker data or row index');
+                        return;
+                    }
+                    
+                    const updatedData = currentData.map((item, index) => {
+                        if (index === suggestion.error.row) {
+                            return { ...item, [suggestion.error.column]: newValue };
+                        }
+                        return item;
+                    });
+                    updateData(entityType, updatedData);
+                    break;
+                }
+                case 'task': {
+                    const currentData = data.tasks;
+                    if (!currentData || suggestion.error.row >= currentData.length) {
+                        console.error('Invalid task data or row index');
+                        return;
+                    }
+                    
+                    const updatedData = currentData.map((item, index) => {
+                        if (index === suggestion.error.row) {
+                            return { ...item, [suggestion.error.column]: newValue };
+                        }
+                        return item;
+                    });
+                    updateData(entityType, updatedData);
+                    break;
+                }
+                default:
+                    console.error('Unknown entity type:', entityType);
+                    return;
+            }
+
+            // Remove the applied suggestion
+            setSmartCorrections(prev => 
+                prev.filter(s => 
+                    s.error.row !== suggestion.error.row ||
+                    s.error.column !== suggestion.error.column ||
+                    s.error.entityType !== suggestion.error.entityType
+                )
+            );
+
+            console.log(`🤖 Applied smart correction for ${entityType} row ${suggestion.error.row}`);
+        } catch (error) {
+            console.error('Error applying smart correction:', error);
+        }
+    };
+
     return {
         correctionSuggestions,
         enhancedCorrections,
+        smartCorrections,
         generateCorrections,
         applyCorrection,
-        applyEnhancedCorrection
+        applyEnhancedCorrection,
+        applySmartCorrection
     };
 }; 
