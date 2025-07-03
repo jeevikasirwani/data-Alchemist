@@ -6,7 +6,6 @@
 // Maintains data integrity during editing
 
 import React, { useState } from 'react';
-import QuickFix from './QuickFix';
 import { ValidationError } from '../utils/validation';
 import { Client, Worker, Task, EntityType, AppData } from '../types';
 import { SCHEMAS } from '../utils/simple-header-mapper';
@@ -164,25 +163,7 @@ export default function DataGrid({ data, entityType, onDataChange, validationErr
                 </div>
             </div>
 
-            {/* QuickFix for missing task references (only for clients) */}
-            {entityType === 'client' && allData?.tasks && (
-                <div className="mt-6">
-                    <QuickFix
-                        errors={validationErrors
-                            .filter(e => e.type !== 'critical' && e.entityType !== 'system')
-                            .map(e => ({
-                                row: e.row,
-                                column: e.column,
-                                message: e.message,
-                                type: e.type as 'error' | 'warning',
-                                entityType: e.entityType as 'client' | 'worker' | 'task'
-                            }))}
-                        data={data as Client[]}
-                        availableTasks={allData.tasks}
-                        onDataChange={(updatedData) => onDataChange(updatedData as Client[])}
-                    />
-                </div>
-            )}
+
         </div>
     );
 }

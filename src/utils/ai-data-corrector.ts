@@ -430,11 +430,11 @@ export class AIDataCorrector {
 
     private groupErrorsByType(errors: ValidationError[]) {
         return {
-            missingTaskRef: errors.filter(e => e.message.includes('not found in tasks')),
+            missingTaskRef: errors.filter(e => e.message.includes('not found')), // More flexible matching
             duplicates: errors.filter(e => e.message.includes('Duplicate')),
             required: errors.filter(e => e.message.includes('required')),
             other: errors.filter(e => 
-                !e.message.includes('not found in tasks') && 
+                !e.message.includes('not found') && 
                 !e.message.includes('Duplicate') && 
                 !e.message.includes('required')
             )
@@ -454,8 +454,10 @@ export class AIDataCorrector {
             const client = clientData[clientIndex];
             if (!client) continue;
             
-            // Extract the missing task ID from error message
-            const missingTaskMatch = error.message.match(/TaskID '(\w+)' not found/);
+            // Extract the missing task ID from error message (flexible matching)
+            const missingTaskMatch = error.message.match(/Task[ID]?\s*[\"']([^\"']+)[\"']\s*not found/) || 
+                                    error.message.match(/TaskID\s*[\"']([^\"']+)[\"']\s*not found/) ||
+                                    error.message.match(/[\"']([^\"']+)[\"']\s*not found/);
             if (!missingTaskMatch) continue;
             
             const missingTaskId = missingTaskMatch[1];
