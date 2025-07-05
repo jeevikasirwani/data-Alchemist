@@ -1,13 +1,6 @@
-/**
- * Simple AI Helper - Minimal AI utilities for the Data Alchemist
- * Focuses on practical AI features without over-engineering
- */
 
 let generativePipeline: any = null;
 
-/**
- * Initialize the AI model (lazy loading)
- */
 async function initAI() {
     if (generativePipeline) return generativePipeline;
     
@@ -21,9 +14,7 @@ async function initAI() {
     }
 }
 
-/**
- * Generate text using AI with fallback to pattern matching
- */
+
 export async function generateWithAI(prompt: string): Promise<string> {
     try {
         const pipeline = await initAI();
@@ -43,9 +34,7 @@ export async function generateWithAI(prompt: string): Promise<string> {
     }
 }
 
-/**
- * Parse AI response and extract structured data
- */
+
 export function parseAIResponse(response: string): any {
     try {
         // Try to extract JSON from response
@@ -67,9 +56,6 @@ export function parseAIResponse(response: string): any {
     }
 }
 
-/**
- * Generate rule recommendations based on data patterns
- */
 export async function generateRuleRecommendations(data: any[]): Promise<string[]> {
     if (!data || data.length === 0) return [];
     
@@ -97,9 +83,7 @@ Suggest rules in this format:
     }
 }
 
-/**
- * Convert natural language to rule definition
- */
+
 export async function naturalLanguageToRule(naturalText: string): Promise<any> {
     const prompt = `Convert this natural language rule to a structured rule definition:
 "${naturalText}"
@@ -140,9 +124,7 @@ Return JSON in this format:
     }
 }
 
-/**
- * Fallback pattern matching when AI is unavailable
- */
+
 function generateFallback(prompt: string): string {
     const lowerPrompt = prompt.toLowerCase();
     
@@ -178,9 +160,7 @@ function generateFallback(prompt: string): string {
     return 'AI suggestion: Review and validate this data manually.';
 }
 
-/**
- * Check if AI is available
- */
+
 export async function isAIAvailable(): Promise<boolean> {
     try {
         const pipeline = await initAI();
